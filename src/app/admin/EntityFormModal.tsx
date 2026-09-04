@@ -17,6 +17,8 @@ type EntityFormModalProps = {
   open: boolean;
   mode: "create" | "edit";
   entityType: EntityType;
+  /** When set, hides the role selector and always submits this role. */
+  fixedRole?: EntityType;
   initial?: AdminEntity | null;
   onClose: () => void;
   onSubmit: (values: EntityFormValues, entityType: EntityType) => void;
@@ -42,6 +44,7 @@ export default function EntityFormModal({
   open,
   mode,
   entityType,
+  fixedRole,
   initial,
   onClose,
   onSubmit,
@@ -62,7 +65,7 @@ export default function EntityFormModal({
 
   useEffect(() => {
     if (!open) return;
-    setSelectedRole(entityType);
+    setSelectedRole(fixedRole ?? entityType);
     setValues(
       initial
         ? {
@@ -78,7 +81,7 @@ export default function EntityFormModal({
       firstFieldRef.current?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [open, initial, entityType]);
+  }, [open, initial, entityType, fixedRole]);
 
   useEffect(() => {
     if (!open) return;
@@ -93,7 +96,9 @@ export default function EntityFormModal({
 
   const title =
     mode === "create"
-      ? "Create user"
+      ? fixedRole
+        ? `Create ${roleLabel(fixedRole).toLowerCase()}`
+        : "Create user"
       : `Edit ${roleLabel(selectedRole).toLowerCase()}`;
 
   function validate(): FieldErrors {
@@ -123,7 +128,7 @@ export default function EntityFormModal({
         email: values.email.trim(),
         password: values.password,
       },
-      selectedRole,
+      fixedRole ?? selectedRole,
     );
     onClose();
   }
@@ -154,7 +159,7 @@ export default function EntityFormModal({
         </p>
 
         <form className="mt-5 space-y-4" noValidate onSubmit={handleSubmit}>
-          {mode === "create" ? (
+          {mode === "create" && !fixedRole ? (
             <div>
               <label
                 htmlFor={roleId}
@@ -189,7 +194,7 @@ export default function EntityFormModal({
             <input
               id={nameId}
               ref={
-                mode === "edit"
+                mode === "edit" || fixedRole
                   ? (firstFieldRef as RefObject<HTMLInputElement>)
                   : undefined
               }
@@ -297,7 +302,7 @@ export default function EntityFormModal({
               {saving
                 ? "Saving…"
                 : mode === "create"
-                  ? `Create ${roleLabel(selectedRole).toLowerCase()}`
+                  ? `Create ${roleLabel(fixedRole ?? selectedRole).toLowerCase()}`
                   : "Save changes"}
             </button>
           </div>
