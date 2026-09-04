@@ -2,12 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BellIcon } from "@heroicons/react/24/outline";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { IconType } from "react-icons";
+import {
+  HiOutlineBell,
+  HiOutlineChevronDoubleLeft,
+  HiOutlineChevronDoubleRight,
+} from "react-icons/hi2";
+
+const COLLAPSE_STORAGE_KEY = "scp-sidebar-collapsed";
 
 export type AppShellNavItem = {
   id: string;
   label: string;
+  icon: IconType;
   badge?: number;
 };
 
@@ -32,6 +40,30 @@ export default function AppShell({
   avatarSrc = "/Images/avatar.jpg",
   notificationCount = 0,
 }: AppShellProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [collapseReady, setCollapseReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+    setCollapseReady(true);
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-bg-app text-text-primary">
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-bg-elevated">
@@ -76,7 +108,7 @@ export default function AppShell({
               onClick={() => onNavigate("notifications")}
               className="relative cursor-pointer rounded-[9px] p-2 text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
-              <BellIcon aria-hidden="true" className="size-5" />
+              <HiOutlineBell aria-hidden="true" className="size-5" />
               {notificationCount > 0 ? (
                 <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-brand-500" />
               ) : null}
@@ -133,17 +165,57 @@ export default function AppShell({
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-60 shrink-0 border-r border-border-subtle bg-bg-elevated md:flex md:flex-col">
-          <nav className="flex flex-col gap-0.5 p-3" aria-label="Primary">
+        <aside
+          className={`relative hidden shrink-0 border-r border-border-subtle bg-bg-elevated transition-[width] duration-150 md:flex md:flex-col ${
+            collapseReady && collapsed ? "w-[72px]" : "w-60"
+          }`}
+        >
+          <div
+            className={`flex items-center border-b border-border-subtle px-2 py-2 ${
+              collapsed ? "justify-center" : "justify-end"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-expanded={!collapsed}
+              aria-controls="app-shell-nav"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="cursor-pointer rounded-[9px] p-2 text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+            >
+              {collapsed ? (
+                <HiOutlineChevronDoubleRight
+                  aria-hidden="true"
+                  className="size-4"
+                />
+              ) : (
+                <HiOutlineChevronDoubleLeft
+                  aria-hidden="true"
+                  className="size-4"
+                />
+              )}
+            </button>
+          </div>
+
+          <nav
+            id="app-shell-nav"
+            className="flex flex-col gap-0.5 p-2"
+            aria-label="Primary"
+          >
             {navItems.map((item) => {
               const active = activeNavId === item.id;
+              const Icon = item.icon;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => onNavigate(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`relative flex cursor-pointer items-center justify-between rounded-[9px] px-3 py-2.5 text-left text-[13px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+                  title={collapsed ? item.label : undefined}
+                  className={`relative flex cursor-pointer items-center rounded-[9px] py-2.5 text-left text-[13px] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+                    collapsed ? "justify-center px-2" : "justify-between gap-2 px-3"
+                  } ${
                     active
                       ? "bg-brand-100/60 font-medium text-brand-700"
                       : "font-medium text-text-secondary hover:bg-bg-muted hover:text-text-primary"
@@ -155,11 +227,25 @@ export default function AppShell({
                       aria-hidden="true"
                     />
                   ) : null}
-                  <span>{item.label}</span>
-                  {item.badge && item.badge > 0 ? (
+                  <span
+                    className={`flex min-w-0 items-center gap-2.5 ${
+                      collapsed ? "" : "flex-1"
+                    }`}
+                  >
+                    <Icon aria-hidden="true" className="size-[18px] shrink-0" />
+                    {!collapsed ? (
+                      <span className="truncate">{item.label}</span>
+                    ) : (
+                      <span className="sr-only">{item.label}</span>
+                    )}
+                  </span>
+                  {!collapsed && item.badge && item.badge > 0 ? (
                     <span className="rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-medium text-text-inverse">
                       {item.badge}
                     </span>
+                  ) : null}
+                  {collapsed && item.badge && item.badge > 0 ? (
+                    <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-brand-500" />
                   ) : null}
                 </button>
               );
@@ -174,18 +260,20 @@ export default function AppShell({
           >
             {navItems.map((item) => {
               const active = activeNavId === item.id;
+              const Icon = item.icon;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => onNavigate(item.id)}
                   aria-current={active ? "page" : undefined}
-                  className={`cursor-pointer whitespace-nowrap rounded-[9px] px-3 py-2 text-[12px] font-medium transition-colors duration-150 ${
+                  className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3 py-2 text-[12px] font-medium transition-colors duration-150 ${
                     active
                       ? "bg-brand-100 text-brand-700"
                       : "text-text-secondary hover:bg-bg-muted"
                   }`}
                 >
+                  <Icon aria-hidden="true" className="size-4 shrink-0" />
                   {item.label}
                   {item.badge && item.badge > 0 ? ` (${item.badge})` : ""}
                 </button>

@@ -2,6 +2,13 @@
 
 import { Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  HiOutlineBell,
+  HiOutlineClipboardDocumentList,
+  HiOutlineCog6Tooth,
+  HiOutlineHome,
+  HiOutlineUsers,
+} from "react-icons/hi2";
 import AppShell from "../../../components/layouts/AppShell";
 import EntityFormModal from "./EntityFormModal";
 import type {
@@ -24,12 +31,20 @@ type ModalState =
 
 type RoleFilter = "all" | EntityType;
 
-const NAV_ITEMS: { id: AdminSection; label: string }[] = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "users", label: "Users" },
-  { id: "products", label: "Product requests" },
-  { id: "notifications", label: "Notifications" },
-  { id: "settings", label: "Settings" },
+const NAV_ITEMS = [
+  { id: "dashboard" as const, label: "Dashboard", icon: HiOutlineHome },
+  { id: "users" as const, label: "Users", icon: HiOutlineUsers },
+  {
+    id: "products" as const,
+    label: "Product requests",
+    icon: HiOutlineClipboardDocumentList,
+  },
+  {
+    id: "notifications" as const,
+    label: "Notifications",
+    icon: HiOutlineBell,
+  },
+  { id: "settings" as const, label: "Settings", icon: HiOutlineCog6Tooth },
 ];
 
 function RoleBadge({ type }: { type: EntityType }) {
