@@ -1,22 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import type { AdminEntity, EntityFormValues, EntityType } from "./types";
+import { roleLabel } from "./types";
 
-type EntityType = "distributor" | "supplier";
-
-type AdminEntity = {
-  id: string;
-  name: string;
-  email: string;
-  password: string;
-  type: EntityType;
-};
-
-type EntityFormValues = {
-  name: string;
-  email: string;
-  password: string;
-};
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type EntityFormModalProps = {
   open: boolean;
@@ -33,6 +28,16 @@ const emptyValues: EntityFormValues = {
   password: "",
 };
 
+type FieldErrors = Partial<Record<keyof EntityFormValues | "role", string>>;
+
+function fieldClass(invalid?: boolean) {
+  return `mt-1.5 h-11 w-full rounded-[9px] border bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:ring-2 disabled:opacity-60 ${
+    invalid
+      ? "border-danger-500 focus:border-danger-500 focus:ring-danger-500/20"
+      : "border-border-subtle focus:border-focus-ring focus:ring-focus-ring/25"
+  }`;
+}
+
 export default function EntityFormModal({
   open,
   mode,
@@ -41,112 +46,259 @@ export default function EntityFormModal({
   onClose,
   onSubmit,
 }: EntityFormModalProps) {
+  const titleId = useId();
+  const nameId = useId();
+  const emailId = useId();
+  const passwordId = useId();
+  const roleId = useId();
+  const firstFieldRef = useRef<HTMLSelectElement | HTMLInputElement | null>(
+    null,
+  );
+
   const [values, setValues] = useState<EntityFormValues>(emptyValues);
   const [selectedRole, setSelectedRole] = useState<EntityType>(entityType);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setSelectedRole(entityType);
     setValues(
       initial
-        ? { name: initial.name, email: initial.email, password: initial.password ?? "" }
+        ? {
+            name: initial.name,
+            email: initial.email,
+            password: initial.password ?? "",
+          }
         : emptyValues,
     );
+    setErrors({});
+    setSaving(false);
+    const frame = window.requestAnimationFrame(() => {
+      firstFieldRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [open, initial, entityType]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
 
   if (!open) return null;
 
-  const title = mode === "create" ? "Add new User" : "Edit user";
+  const title =
+    mode === "create"
+      ? "Create user"
+      : `Edit ${roleLabel(selectedRole).toLowerCase()}`;
+
+  function validate(): FieldErrors {
+    const next: FieldErrors = {};
+    if (!values.name.trim()) next.name = "Name is required";
+    const email = values.email.trim();
+    if (!email) next.email = "Email address is required";
+    else if (!EMAIL_PATTERN.test(email)) next.email = "Enter a valid email address";
+    if (mode === "create" && !values.password.trim()) {
+      next.password = "Temporary password is required";
+    } else if (values.password.trim() && values.password.trim().length < 6) {
+      next.password = "Password must be at least 6 characters";
+    }
+    return next;
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit(values, selectedRole);
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setSaving(true);
+    onSubmit(
+      {
+        name: values.name.trim(),
+        email: values.email.trim(),
+        password: values.password,
+      },
+      selectedRole,
+    );
     onClose();
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#123a3c]/45 px-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="entity-form-title"
-        className="w-full max-w-md rounded-[12px] bg-white p-6 shadow-[0_16px_40px_rgba(18,58,60,0.18)]"
+        aria-labelledby={titleId}
+        className="w-full max-w-md rounded-[12px] border border-border-subtle bg-bg-elevated p-6 shadow-sm"
       >
-        <h2 id="entity-form-title" className="text-[18px] font-medium tracking-[-0.02em] text-[#123a3c]">
+        <h2
+          id={titleId}
+          className="font-display text-[18px] font-semibold tracking-[-0.02em] text-text-primary"
+        >
           {title}
         </h2>
+        <p className="mt-1 text-[13px] text-text-secondary">
+          {mode === "create"
+            ? "Creates the account with default user settings."
+            : "Update profile details for this account."}
+        </p>
 
-        <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
-          <label className="block text-[12px] font-medium text-[#123a3c]">
-            <span>
-              Role <span className="text-[#168aa0]">*</span>
-            </span>
-            <select
-              required
-              value={selectedRole}
-              onChange={(event) => setSelectedRole(event.target.value as EntityType)}
-              className="mt-1.5 h-11 w-full rounded-[9px] border border-[#e3e3e3] bg-white px-3 text-[12px] text-[#123a3c] outline-none focus:border-[#55aeb5]"
+        <form className="mt-5 space-y-4" noValidate onSubmit={handleSubmit}>
+          {mode === "create" ? (
+            <div>
+              <label
+                htmlFor={roleId}
+                className="block text-[12px] font-medium text-text-primary"
+              >
+                Role <span className="text-brand-600">*</span>
+              </label>
+              <select
+                id={roleId}
+                ref={firstFieldRef as RefObject<HTMLSelectElement>}
+                required
+                value={selectedRole}
+                disabled={saving}
+                onChange={(event) =>
+                  setSelectedRole(event.target.value as EntityType)
+                }
+                className={fieldClass()}
+              >
+                <option value="distributor">Distributor</option>
+                <option value="supplier">Supplier</option>
+              </select>
+            </div>
+          ) : null}
+
+          <div>
+            <label
+              htmlFor={nameId}
+              className="block text-[12px] font-medium text-text-primary"
             >
-              <option value="distributor">Distributor</option>
-              <option value="supplier">Supplier</option>
-            </select>
-          </label>
-
-          <label className="block text-[12px] font-medium text-[#123a3c]">
-            <span>
-              Name <span className="text-[#168aa0]">*</span>
-            </span>
+              Name <span className="text-brand-600">*</span>
+            </label>
             <input
+              id={nameId}
+              ref={
+                mode === "edit"
+                  ? (firstFieldRef as RefObject<HTMLInputElement>)
+                  : undefined
+              }
               required
               value={values.name}
-              onChange={(event) => setValues((prev) => ({ ...prev, name: event.target.value }))}
-              className="mt-1.5 h-11 w-full rounded-[9px] border border-[#e3e3e3] px-3 text-[12px] text-[#123a3c] outline-none placeholder:text-[#9ca3a3] focus:border-[#55aeb5]"
-              placeholder="Enter name"
+              disabled={saving}
+              aria-invalid={errors.name ? true : undefined}
+              onChange={(event) => {
+                setValues((prev) => ({ ...prev, name: event.target.value }));
+                if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+              className={fieldClass(Boolean(errors.name))}
+              placeholder="Full name"
             />
-          </label>
+            {errors.name ? (
+              <p role="alert" className="mt-1.5 text-[12px] text-danger-500">
+                {errors.name}
+              </p>
+            ) : null}
+          </div>
 
-          <label className="block text-[12px] font-medium text-[#123a3c]">
-            <span>
-              Email <span className="text-[#168aa0]">*</span>
-            </span>
+          <div>
+            <label
+              htmlFor={emailId}
+              className="block text-[12px] font-medium text-text-primary"
+            >
+              Email <span className="text-brand-600">*</span>
+            </label>
             <input
+              id={emailId}
               required
               type="email"
+              inputMode="email"
+              autoComplete="off"
               value={values.email}
-              onChange={(event) => setValues((prev) => ({ ...prev, email: event.target.value }))}
-              className="mt-1.5 h-11 w-full rounded-[9px] border border-[#e3e3e3] px-3 text-[12px] text-[#123a3c] outline-none placeholder:text-[#9ca3a3] focus:border-[#55aeb5]"
-              placeholder="Enter email"
+              disabled={saving}
+              aria-invalid={errors.email ? true : undefined}
+              onChange={(event) => {
+                setValues((prev) => ({ ...prev, email: event.target.value }));
+                if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
+              }}
+              className={fieldClass(Boolean(errors.email))}
+              placeholder="you@company.com"
             />
-          </label>
+            {errors.email ? (
+              <p role="alert" className="mt-1.5 text-[12px] text-danger-500">
+                {errors.email}
+              </p>
+            ) : null}
+          </div>
 
-          <label className="block text-[12px] font-medium text-[#123a3c]">
-            <span>
-              Password <span className="text-[#168aa0]">*</span>
-            </span>
+          <div>
+            <label
+              htmlFor={passwordId}
+              className="block text-[12px] font-medium text-text-primary"
+            >
+              {mode === "create" ? "Temporary password" : "Password"}{" "}
+              {mode === "create" ? (
+                <span className="text-brand-600">*</span>
+              ) : (
+                <span className="font-normal text-text-muted">(optional)</span>
+              )}
+            </label>
             <input
-              required
+              id={passwordId}
+              required={mode === "create"}
               type="password"
               autoComplete="new-password"
               value={values.password}
-              onChange={(event) => setValues((prev) => ({ ...prev, password: event.target.value }))}
-              className="mt-1.5 h-11 w-full rounded-[9px] border border-[#e3e3e3] px-3 text-[12px] text-[#123a3c] outline-none placeholder:text-[#9ca3a3] focus:border-[#55aeb5]"
-              placeholder="Enter password"
+              disabled={saving}
+              aria-invalid={errors.password ? true : undefined}
+              onChange={(event) => {
+                setValues((prev) => ({ ...prev, password: event.target.value }));
+                if (errors.password)
+                  setErrors((prev) => ({ ...prev, password: undefined }));
+              }}
+              className={fieldClass(Boolean(errors.password))}
+              placeholder={
+                mode === "create"
+                  ? "Set a temporary password"
+                  : "Leave blank to keep current"
+              }
             />
-          </label>
+            {errors.password ? (
+              <p role="alert" className="mt-1.5 text-[12px] text-danger-500">
+                {errors.password}
+              </p>
+            ) : null}
+          </div>
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-10 rounded-[9px] px-4 text-[13px] font-medium text-[#123a3c] transition-colors hover:bg-[#f3fafa]"
+              disabled={saving}
+              className="h-10 cursor-pointer rounded-[9px] px-4 text-[13px] font-medium text-text-primary transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="h-10 rounded-[9px] bg-[#1595a0] px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#117f89]"
+              disabled={saving}
+              className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {mode === "create" ? "Add" : "Save"}
+              {saving
+                ? "Saving…"
+                : mode === "create"
+                  ? `Create ${roleLabel(selectedRole).toLowerCase()}`
+                  : "Save changes"}
             </button>
           </div>
         </form>
