@@ -1,7 +1,78 @@
 @import "tailwindcss";
 
+:root {
+  /* Surfaces */
+  --bg-app: #f4f7f7;
+  --bg-elevated: #ffffff;
+  --bg-muted: #e8eeee;
+  --bg-inset: #dff0f1;
+
+  /* Ink */
+  --text-primary: #123a3c;
+  --text-secondary: #4a6365;
+  --text-muted: #7a8f90;
+  --text-inverse: #ffffff;
+
+  /* Brand / action */
+  --brand-500: #1595a0;
+  --brand-600: #117f89;
+  --brand-700: #0e6a72;
+  --brand-100: #d5eef0;
+
+  /* Borders */
+  --border-subtle: #d5e0e0;
+  --border-strong: #b7c8c9;
+  --focus-ring: #55aeb5;
+
+  /* Feedback */
+  --danger-500: #c23b2e;
+  --danger-50: #fce8e6;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(18, 58, 60, 0.06);
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+}
+
+@theme inline {
+  --color-bg-app: var(--bg-app);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-muted: var(--bg-muted);
+  --color-bg-inset: var(--bg-inset);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-100: var(--brand-100);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-focus-ring: var(--focus-ring);
+  --color-danger-500: var(--danger-500);
+  --color-danger-50: var(--danger-50);
+  --font-sans: var(--font-source-sans-3), "Source Sans 3", system-ui, sans-serif;
+  --font-display: var(--font-ibm-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-sm: var(--shadow-sm);
+}
 
 body {
- 
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
