@@ -26,6 +26,7 @@ export type ProductRequest = {
   progress: number;
   supplierId: string;
   supplierName: string;
+  distributorName: string;
   requestedAt: string;
   status: ProductRequestStatus;
 };

@@ -13,6 +13,7 @@ function buildQrPayload(request: ProductRequest) {
     id: request.id,
     product: request.productName,
     supplier: request.supplierName,
+    distributor: request.distributorName,
     status: request.status,
     requestedAt: request.requestedAt,
   });

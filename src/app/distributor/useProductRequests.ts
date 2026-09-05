@@ -18,6 +18,7 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 72,
     supplierId: "demo-supplier-1",
     supplierName: "Green Valley Foods",
+    distributorName: "Northwind Distributors",
     requestedAt: "2026-08-28T10:15:00.000Z",
     status: "pending",
   },
@@ -29,6 +30,7 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 100,
     supplierId: "demo-supplier-2",
     supplierName: "Sunrise Grains Co.",
+    distributorName: "Harbor Supply Group",
     requestedAt: "2026-08-12T14:40:00.000Z",
     status: "approved",
   },
@@ -40,6 +42,7 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 35,
     supplierId: "demo-supplier-3",
     supplierName: "Bean & Barrel",
+    distributorName: "Northwind Distributors",
     requestedAt: "2026-09-01T09:05:00.000Z",
     status: "pending",
   },
@@ -51,6 +54,7 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 18,
     supplierId: "demo-supplier-1",
     supplierName: "Green Valley Foods",
+    distributorName: "Summit Retail Partners",
     requestedAt: "2026-09-03T16:20:00.000Z",
     status: "rejected",
   },
@@ -89,6 +93,10 @@ function normalizeRequest(
     progress,
     supplierId: raw.supplierId,
     supplierName: raw.supplierName,
+    distributorName:
+      typeof raw.distributorName === "string" && raw.distributorName.trim()
+        ? raw.distributorName.trim()
+        : "Unknown distributor",
     requestedAt:
       typeof raw.requestedAt === "string" && raw.requestedAt
         ? raw.requestedAt
@@ -141,6 +149,7 @@ export function useProductRequests() {
   function addRequest(
     values: ProductRequestFormValues,
     supplierName: string,
+    distributorName: string,
   ) {
     const request: ProductRequest = {
       id: crypto.randomUUID(),
@@ -149,6 +158,7 @@ export function useProductRequests() {
       progress: values.progress,
       supplierId: values.supplierId,
       supplierName,
+      distributorName: distributorName.trim() || "Unknown distributor",
       requestedAt: new Date().toISOString(),
       status: values.status,
     };

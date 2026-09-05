@@ -190,6 +190,7 @@ function DistributorDashboardInner() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const distributorName = "Prantor";
 
   const {
     ready: entitiesReady,
@@ -276,7 +277,7 @@ function DistributorDashboardInner() {
   ) {
     if (!requestModal.open) return;
     if (requestModal.mode === "create") {
-      addRequest(values, supplierName);
+      addRequest(values, supplierName, distributorName);
       return;
     }
     updateRequest(requestModal.request.id, values, supplierName);
@@ -300,6 +301,7 @@ function DistributorDashboardInner() {
         navItems={NAV_ITEMS}
         activeNavId={section}
         onNavigate={navigate}
+        userName={distributorName}
         userRole="DISTRIBUTOR"
         notificationCount={0}
       >
