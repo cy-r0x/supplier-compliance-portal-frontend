@@ -1,6 +1,8 @@
 "use client";
 
 import { FocusEvent, FormEvent, useId, useState } from "react";
+import { useAuth } from "../../src/lib/auth/AuthProvider";
+import { ApiError } from "../../src/lib/api/types";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -67,6 +69,7 @@ function BrandMark() {
 }
 
 export default function LogInPage() {
+  const { login } = useAuth();
   const emailId = useId();
   const passwordId = useId();
   const emailErrorId = useId();
@@ -99,12 +102,19 @@ export default function LogInPage() {
     setEmailError(nextEmailError);
     if (nextEmailError) return;
 
+    const password = new FormData(form).get("password");
+    const passwordValue = typeof password === "string" ? password : "";
+
     setLoading(true);
 
     try {
-      // Auth API not wired yet — demonstrate loading / error UI states
-      await new Promise((resolve) => setTimeout(resolve, 700));
-      setError("Invalid email or password");
+      await login(emailValue.trim(), passwordValue);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setError("Invalid email or password");
+      } else {
+        setError("Unable to sign in. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

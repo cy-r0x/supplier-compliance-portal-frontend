@@ -9,6 +9,7 @@ import {
   HiOutlineChevronDoubleLeft,
   HiOutlineChevronDoubleRight,
 } from "react-icons/hi2";
+import { useAuth } from "../../src/lib/auth/AuthProvider";
 
 const COLLAPSE_STORAGE_KEY = "scp-sidebar-collapsed";
 
@@ -24,9 +25,6 @@ type AppShellProps = {
   activeNavId: string;
   onNavigate: (id: string) => void;
   children: ReactNode;
-  userName?: string;
-  userRole?: string;
-  avatarSrc?: string;
   notificationCount?: number;
 };
 
@@ -35,13 +33,15 @@ export default function AppShell({
   activeNavId,
   onNavigate,
   children,
-  userName = "Prantor",
-  userRole = "SUPER_ADMIN",
-  avatarSrc = "/Images/avatar.jpg",
   notificationCount = 0,
 }: AppShellProps) {
+  const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [collapseReady, setCollapseReady] = useState(false);
+
+  const userName = user?.name ?? "";
+  const userRole = user?.role ?? "";
+  const avatarSrc = user?.photo || "/Images/avatar.jpg";
 
   useEffect(() => {
     try {
@@ -69,7 +69,7 @@ export default function AppShell({
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-bg-elevated">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
           <Link
-            href="/admin"
+            href="/dashboard"
             className="flex min-w-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
             <span
@@ -151,13 +151,14 @@ export default function AppShell({
                   Settings
                 </button>
                 <div className="my-1 border-t border-border-subtle" />
-                <Link
-                  href="/"
+                <button
+                  type="button"
                   role="menuitem"
-                  className="block px-3.5 py-2 text-[12px] text-text-primary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600"
+                  onClick={() => logout()}
+                  className="block w-full cursor-pointer px-3.5 py-2 text-left text-[12px] text-text-primary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600"
                 >
                   Log out
-                </Link>
+                </button>
               </div>
             </div>
           </div>
