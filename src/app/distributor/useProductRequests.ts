@@ -181,11 +181,22 @@ export function useProductRequests() {
     persist(requests.filter((request) => request.id !== id));
   }
 
+  function approveRequest(id: string) {
+    persist(
+      requests.map((request) =>
+        request.id === id
+          ? { ...request, status: "approved" as const }
+          : request,
+      ),
+    );
+  }
+
   return {
     ready,
     requests,
     addRequest,
     updateRequest,
     deleteRequest,
+    approveRequest,
   };
 }

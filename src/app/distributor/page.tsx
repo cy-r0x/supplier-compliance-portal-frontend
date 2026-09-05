@@ -15,6 +15,7 @@ import type { AdminEntity, EntityFormValues } from "../admin/types";
 import { formatDate } from "../admin/types";
 import { useAdminEntities } from "../admin/useAdminEntities";
 import ProductRequestModal from "./ProductRequestModal";
+import ProductQrCode from "./ProductQrCode";
 import type {
   DistributorSection,
   ProductRequest,
@@ -204,6 +205,7 @@ function DistributorDashboardInner() {
     addRequest,
     updateRequest,
     deleteRequest,
+    approveRequest,
   } = useProductRequests();
 
   const ready = entitiesReady && requestsReady;
@@ -286,6 +288,12 @@ function DistributorDashboardInner() {
     }
   }
 
+  function handleApproveRequest(request: ProductRequest) {
+    if (window.confirm(`Approve request for ${request.productName}?`)) {
+      approveRequest(request.id);
+    }
+  }
+
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <AppShell
@@ -320,6 +328,7 @@ function DistributorDashboardInner() {
             onCreate={openCreateRequest}
             onEdit={openEditRequest}
             onDelete={handleDeleteRequest}
+            onApprove={handleApproveRequest}
             onCreateSupplier={openCreateSupplier}
           />
         ) : (
@@ -531,6 +540,7 @@ function ProductRequestsSection({
   onCreate,
   onEdit,
   onDelete,
+  onApprove,
   onCreateSupplier,
 }: {
   requests: ProductRequest[];
@@ -538,8 +548,26 @@ function ProductRequestsSection({
   onCreate: () => void;
   onEdit: (request: ProductRequest) => void;
   onDelete: (request: ProductRequest) => void;
+  onApprove: (request: ProductRequest) => void;
   onCreateSupplier: () => void;
 }) {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | ProductRequestStatus
+  >("all");
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return requests.filter((request) => {
+      if (statusFilter !== "all" && request.status !== statusFilter) return false;
+      if (!q) return true;
+      return (
+        request.productName.toLowerCase().includes(q) ||
+        request.supplierName.toLowerCase().includes(q)
+      );
+    });
+  }, [requests, search, statusFilter]);
+
   return (
     <div>
       <PageHeader
@@ -586,73 +614,139 @@ function ProductRequestsSection({
           }
         />
       ) : (
-        <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
-          <table className="min-w-full text-left text-[13px]">
-            <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Product</th>
-                <th className="px-4 py-2.5 font-medium">Progress</th>
-                <th className="px-4 py-2.5 font-medium">Supplier</th>
-                <th className="px-4 py-2.5 font-medium">Date of request</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle">
-              {requests.map((request) => (
-                <tr key={request.id} className="h-14">
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-3">
-                      <Image
-                        src={request.productImage}
-                        alt=""
-                        width={40}
-                        height={40}
-                        unoptimized
-                        className="size-10 shrink-0 rounded-[8px] object-cover outline outline-border-subtle"
-                      />
-                      <span className="font-medium text-text-primary">
-                        {request.productName}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2">
-                    <ProgressCircle value={request.progress} />
-                  </td>
-                  <td className="px-4 py-2 text-text-secondary">
-                    {request.supplierName}
-                  </td>
-                  <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
-                    {formatDate(request.requestedAt)}
-                  </td>
-                  <td className="px-4 py-2">
-                    <StatusBadge status={request.status} />
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(request)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(request)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label className="sr-only" htmlFor="product-search">
+              Search product requests
+            </label>
+            <input
+              id="product-search"
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search product or supplier"
+              className="h-10 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25 sm:max-w-xs"
+            />
+            <div
+              className="flex flex-wrap gap-1"
+              role="group"
+              aria-label="Filter by status"
+            >
+              {(
+                [
+                  ["all", "All"],
+                  ["pending", "Pending"],
+                  ["approved", "Approved"],
+                  ["rejected", "Rejected"],
+                ] as const
+              ).map(([value, label]) => {
+                const active = statusFilter === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStatusFilter(value)}
+                    aria-pressed={active}
+                    className={`h-9 cursor-pointer rounded-[9px] px-3 text-[12px] font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${
+                      active
+                        ? "bg-brand-100 text-brand-700"
+                        : "bg-bg-elevated text-text-secondary hover:bg-bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length === 0 ? (
+            <EmptyState
+              title="No matching requests"
+              description="Try a different search or status filter."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
+              <table className="min-w-full text-left text-[13px]">
+                <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Product</th>
+                    <th className="px-4 py-2.5 font-medium">Progress</th>
+                    <th className="px-4 py-2.5 font-medium">Supplier</th>
+                    <th className="px-4 py-2.5 font-medium">Date of request</th>
+                    <th className="px-4 py-2.5 font-medium">Status</th>
+                    <th className="px-4 py-2.5 font-medium">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {filtered.map((request) => (
+                    <tr key={request.id} className="h-14">
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={request.productImage}
+                            alt=""
+                            width={40}
+                            height={40}
+                            unoptimized
+                            className="size-10 shrink-0 rounded-[8px] object-cover outline outline-border-subtle"
+                          />
+                          <span className="font-medium text-text-primary">
+                            {request.productName}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2">
+                        <ProgressCircle value={request.progress} />
+                      </td>
+                      <td className="px-4 py-2 text-text-secondary">
+                        {request.supplierName}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
+                        {formatDate(request.requestedAt)}
+                      </td>
+                      <td className="px-4 py-2">
+                        <StatusBadge status={request.status} />
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="flex gap-1">
+                            {request.status !== "approved" ? (
+                              <button
+                                type="button"
+                                onClick={() => onApprove(request)}
+                                className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-700 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                              >
+                                Approve
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() => onEdit(request)}
+                              className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDelete(request)}
+                              className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          <ProductQrCode request={request} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
