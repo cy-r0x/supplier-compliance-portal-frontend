@@ -15,17 +15,10 @@ import {
   type ComplianceTextField,
   type ComplianceTextFields,
 } from "../../../../lib/compliance";
+import TiptapEditor, { isEmptyHtml } from "../../../../../components/editor/TiptapEditor";
 import { useProductRequests } from "../../../distributor/useProductRequests";
 
 const SUPPLIER_NAME = "Alex Supplier";
-
-function textareaClass(invalid?: boolean) {
-  return `mt-2 min-h-[88px] w-full resize-y rounded-[9px] border bg-bg-elevated px-3 py-2.5 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:ring-2 ${
-    invalid
-      ? "border-danger-500 focus:border-danger-500 focus:ring-danger-500/20"
-      : "border-border-subtle focus:border-focus-ring focus:ring-focus-ring/25"
-  }`;
-}
 
 function FieldCheckboxes({
   required,
@@ -174,7 +167,7 @@ export default function SupplierProductCompliancePage() {
 
     for (const { key, label } of TEXT_FIELD_CONFIG) {
       const field = values[key];
-      if (field.required && !field.value.trim()) {
+      if (field.required && isEmptyHtml(field.value)) {
         next[key] = `${label} is required`;
       }
     }
@@ -320,15 +313,12 @@ export default function SupplierProductCompliancePage() {
                           }
                         />
                       </div>
-                      <textarea
+                      <TiptapEditor
                         id={key}
                         value={field.value}
-                        aria-invalid={invalid ? true : undefined}
-                        onChange={(event) =>
-                          updateText(key, { value: event.target.value })
-                        }
-                        className={textareaClass(Boolean(invalid))}
+                        invalid={Boolean(invalid)}
                         placeholder={`Enter ${label.toLowerCase()}`}
+                        onChange={(html) => updateText(key, { value: html })}
                       />
                       {invalid ? (
                         <p
