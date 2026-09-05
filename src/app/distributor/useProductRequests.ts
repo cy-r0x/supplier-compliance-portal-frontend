@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { ComplianceSubmission } from "../../lib/compliance";
+import { addComplianceNotification } from "../../lib/useNotifications";
 import type {
   ProductRequest,
   ProductRequestFormValues,
@@ -8,6 +10,7 @@ import type {
 } from "./types";
 
 const STORAGE_KEY = "scp-product-requests";
+const COMPLIANCE_STORAGE_KEY = "scp-compliance-submissions";
 
 const DUMMY_REQUESTS: ProductRequest[] = [
   {
@@ -18,9 +21,10 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 72,
     supplierId: "demo-supplier-1",
     supplierName: "Green Valley Foods",
-    distributorName: "Northwind Distributors",
+    distributorName: "Prantor",
     requestedAt: "2026-08-28T10:15:00.000Z",
     status: "pending",
+    submitted: false,
   },
   {
     id: "demo-req-2",
@@ -33,6 +37,8 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     distributorName: "Harbor Supply Group",
     requestedAt: "2026-08-12T14:40:00.000Z",
     status: "approved",
+    submitted: true,
+    submittedAt: "2026-08-20T11:00:00.000Z",
   },
   {
     id: "demo-req-3",
@@ -42,9 +48,10 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     progress: 35,
     supplierId: "demo-supplier-3",
     supplierName: "Bean & Barrel",
-    distributorName: "Northwind Distributors",
+    distributorName: "Prantor",
     requestedAt: "2026-09-01T09:05:00.000Z",
     status: "pending",
+    submitted: false,
   },
   {
     id: "demo-req-4",
@@ -57,6 +64,7 @@ const DUMMY_REQUESTS: ProductRequest[] = [
     distributorName: "Summit Retail Partners",
     requestedAt: "2026-09-03T16:20:00.000Z",
     status: "rejected",
+    submitted: false,
   },
 ];
 
@@ -102,6 +110,9 @@ function normalizeRequest(
         ? raw.requestedAt
         : new Date(0).toISOString(),
     status,
+    submitted: raw.submitted === true,
+    submittedAt:
+      typeof raw.submittedAt === "string" ? raw.submittedAt : undefined,
   };
 }
 
@@ -130,6 +141,22 @@ function readRequests(): ProductRequest[] {
 
 function writeRequests(requests: ProductRequest[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(requests));
+}
+
+function readComplianceSubmissions(): Record<string, ComplianceSubmission> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(COMPLIANCE_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, ComplianceSubmission>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeComplianceSubmissions(data: Record<string, ComplianceSubmission>) {
+  window.localStorage.setItem(COMPLIANCE_STORAGE_KEY, JSON.stringify(data));
 }
 
 export function useProductRequests() {
@@ -161,6 +188,7 @@ export function useProductRequests() {
       distributorName: distributorName.trim() || "Unknown distributor",
       requestedAt: new Date().toISOString(),
       status: values.status,
+      submitted: false,
     };
     persist([request, ...requests]);
   }
@@ -201,6 +229,44 @@ export function useProductRequests() {
     );
   }
 
+  function submitCompliance(
+    id: string,
+    submission: ComplianceSubmission,
+    supplierName: string,
+  ) {
+    const request = requests.find((item) => item.id === id);
+    if (!request) return;
+
+    const submissions = readComplianceSubmissions();
+    submissions[id] = submission;
+    writeComplianceSubmissions(submissions);
+
+    const now = new Date().toISOString();
+    persist(
+      requests.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              progress: 100,
+              submitted: true,
+              submittedAt: now,
+            }
+          : item,
+      ),
+    );
+
+    addComplianceNotification({
+      productRequestId: id,
+      productName: request.productName,
+      supplierName,
+      distributorName: request.distributorName,
+    });
+  }
+
+  function getComplianceSubmission(id: string): ComplianceSubmission | null {
+    return readComplianceSubmissions()[id] ?? null;
+  }
+
   return {
     ready,
     requests,
@@ -208,5 +274,7 @@ export function useProductRequests() {
     updateRequest,
     deleteRequest,
     approveRequest,
+    submitCompliance,
+    getComplianceSubmission,
   };
 }

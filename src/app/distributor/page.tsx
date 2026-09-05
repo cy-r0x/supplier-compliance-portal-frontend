@@ -9,6 +9,7 @@ import {
   HiOutlineHome,
   HiOutlineTruck,
 } from "react-icons/hi2";
+import { useNotifications } from "../../lib/useNotifications";
 import AppShell from "../../../components/layouts/AppShell";
 import EntityFormModal from "../admin/EntityFormModal";
 import type { AdminEntity, EntityFormValues } from "../admin/types";
@@ -209,7 +210,10 @@ function DistributorDashboardInner() {
     approveRequest,
   } = useProductRequests();
 
-  const ready = entitiesReady && requestsReady;
+  const { ready: notificationsReady, notifications, unreadCount } =
+    useNotifications(distributorName);
+
+  const ready = entitiesReady && requestsReady && notificationsReady;
 
   const sectionParam = searchParams.get("section");
   const section: DistributorSection =
@@ -303,7 +307,7 @@ function DistributorDashboardInner() {
         onNavigate={navigate}
         userName={distributorName}
         userRole="DISTRIBUTOR"
-        notificationCount={0}
+        notificationCount={unreadCount}
       >
         {!ready ? (
           <div>
@@ -334,7 +338,7 @@ function DistributorDashboardInner() {
             onCreateSupplier={openCreateSupplier}
           />
         ) : (
-          <NotificationsSection />
+          <NotificationsSection notifications={notifications} />
         )}
       </AppShell>
 
@@ -754,17 +758,47 @@ function ProductRequestsSection({
   );
 }
 
-function NotificationsSection() {
+function NotificationsSection({
+  notifications,
+}: {
+  notifications: {
+    id: string;
+    message: string;
+    supplierName: string;
+    productName: string;
+    createdAt: string;
+    read: boolean;
+  }[];
+}) {
   return (
     <div>
       <PageHeader
         title="Notifications"
         description="Inbox for request and user activity"
       />
-      <EmptyState
-        title="You're all caught up"
-        description="New notifications will show here when activity starts."
-      />
+      {notifications.length === 0 ? (
+        <EmptyState
+          title="You're all caught up"
+          description="New notifications will show here when activity starts."
+        />
+      ) : (
+        <ul className="divide-y divide-border-subtle overflow-hidden rounded-[12px] border border-border-subtle bg-bg-elevated">
+          {notifications.map((notification) => (
+            <li
+              key={notification.id}
+              className={`px-4 py-4 ${notification.read ? "" : "bg-brand-50/40"}`}
+            >
+              <p className="text-[13px] text-text-primary">
+                {notification.message}
+              </p>
+              <p className="mt-1 text-[12px] text-text-muted">
+                {notification.supplierName} · {notification.productName} ·{" "}
+                {formatDate(notification.createdAt)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

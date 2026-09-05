@@ -29,6 +29,8 @@ export type ProductRequest = {
   distributorName: string;
   requestedAt: string;
   status: ProductRequestStatus;
+  submitted: boolean;
+  submittedAt?: string;
 };
 
 export type ProductRequestFormValues = {

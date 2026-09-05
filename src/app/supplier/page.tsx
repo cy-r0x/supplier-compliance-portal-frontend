@@ -194,8 +194,8 @@ function SupplierDashboardInner() {
     [requests],
   );
 
-  function handleSubmit(_request: ProductRequest) {
-    // Submit behavior will be defined later.
+  function handleEdit(request: ProductRequest) {
+    router.push(`/supplier/product/${request.id}`);
   }
 
   return (
@@ -223,7 +223,7 @@ function SupplierDashboardInner() {
         ) : section === "products" ? (
           <ProductRequestsSection
             requests={requests}
-            onSubmit={handleSubmit}
+            onEdit={handleEdit}
           />
         ) : (
           <NotificationsSection />
@@ -282,10 +282,10 @@ function StatCard({ label, value }: { label: string; value: number }) {
 
 function ProductRequestsSection({
   requests,
-  onSubmit,
+  onEdit,
 }: {
   requests: ProductRequest[];
-  onSubmit: (request: ProductRequest) => void;
+  onEdit: (request: ProductRequest) => void;
 }) {
   const [search, setSearch] = useState("");
 
@@ -374,13 +374,19 @@ function ProductRequestsSection({
                         {formatDate(request.requestedAt)}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => onSubmit(request)}
-                          className="cursor-pointer rounded-[7px] bg-brand-500 px-2.5 py-1.5 text-[12px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                        >
-                          Submit
-                        </button>
+                        {request.submitted ? (
+                          <span className="text-[12px] font-medium text-brand-700">
+                            Submitted
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(request)}
+                            className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                          >
+                            Edit
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
