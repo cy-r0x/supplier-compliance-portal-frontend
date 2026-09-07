@@ -86,13 +86,9 @@ function setEditorLink(editor: NonNullable<ReturnType<typeof useEditor>>) {
   editor.chain().focus().setTextSelection({ from, to }).setLink({ href }).run();
 }
 
-export function isEmptyHtml(html: string) {
-  const text = html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .trim();
-  return text.length === 0;
-}
+import { isEmptyHtml } from "@/lib/html";
+
+export { isEmptyHtml };
 
 export default function TiptapEditor({
   id,

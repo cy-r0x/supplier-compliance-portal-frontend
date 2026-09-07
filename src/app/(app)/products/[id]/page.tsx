@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import TiptapEditor, { isEmptyHtml } from "../../../../../components/editor/TiptapEditor";
+import TiptapEditor from "../../../../../components/editor/TiptapEditor";
+import { isEmptyHtml } from "@/lib/html";
 import {
   DOCUMENT_FIELD_CONFIG,
   TEXT_FIELD_CONFIG,
