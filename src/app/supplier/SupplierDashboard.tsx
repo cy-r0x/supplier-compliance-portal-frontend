@@ -10,9 +10,11 @@ import {
   HiOutlineHome,
 } from "react-icons/hi2";
 import AppShell from "../../../components/layouts/AppShell";
+import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
 import { formatDate } from "../admin/types";
 import type { ProductRequest } from "../distributor/types";
 import { useProductRequests } from "../distributor/useProductRequests";
+import { useNotifications } from "../../lib/useNotifications";
 
 type SupplierSection = "dashboard" | "products" | "notifications";
 
@@ -163,6 +165,19 @@ function SupplierDashboardInner() {
   const searchParams = useSearchParams();
   const { ready, requests } = useProductRequests();
 
+  const {
+    ready: notificationsReady,
+    notifications,
+    unreadCount,
+    error: notificationsError,
+    markRead,
+    markAllRead,
+    refetch: refetchNotifications,
+    hasMore: hasMoreNotifications,
+    loadingMore: loadingMoreNotifications,
+    loadMore: loadMoreNotifications,
+  } = useNotifications();
+
   const sectionParam = searchParams.get("section");
   const section: SupplierSection =
     sectionParam && isSupplierSection(sectionParam)
@@ -207,7 +222,7 @@ function SupplierDashboardInner() {
         navItems={NAV_ITEMS}
         activeNavId={section}
         onNavigate={navigate}
-        notificationCount={0}
+        notificationCount={unreadCount}
       >
         {!ready ? (
           <div>
@@ -227,7 +242,18 @@ function SupplierDashboardInner() {
             onEdit={handleEdit}
           />
         ) : (
-          <NotificationsSection />
+          <NotificationsInbox
+            notifications={notifications}
+            unreadCount={unreadCount}
+            loading={!notificationsReady}
+            error={notificationsError}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onRetry={refetchNotifications}
+            hasMore={hasMoreNotifications}
+            loadingMore={loadingMoreNotifications}
+            onLoadMore={loadMoreNotifications}
+          />
         )}
       </AppShell>
     </div>
@@ -397,21 +423,6 @@ function ProductRequestsSection({
           )}
         </>
       )}
-    </div>
-  );
-}
-
-function NotificationsSection() {
-  return (
-    <div>
-      <PageHeader
-        title="Notifications"
-        description="Inbox for request and user activity"
-      />
-      <EmptyState
-        title="You're all caught up"
-        description="New notifications will show here when activity starts."
-      />
     </div>
   );
 }

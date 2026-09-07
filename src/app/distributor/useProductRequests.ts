@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import type { ComplianceSubmission } from "../../lib/compliance";
-import { addComplianceNotification } from "../../lib/useNotifications";
 import type {
   ProductRequest,
   ProductRequestFormValues,
@@ -254,13 +253,6 @@ export function useProductRequests() {
           : item,
       ),
     );
-
-    addComplianceNotification({
-      productRequestId: id,
-      productName: request.productName,
-      supplierName,
-      distributorName: request.distributorName,
-    });
   }
 
   function getComplianceSubmission(id: string): ComplianceSubmission | null {

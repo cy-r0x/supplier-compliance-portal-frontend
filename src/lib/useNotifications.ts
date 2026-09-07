@@ -1,101 +1,140 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  listNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type ApiNotification,
+  type NotificationType,
+} from "./api/notifications-api";
+import { useAuth } from "./auth/AuthProvider";
 
 export type PortalNotification = {
   id: string;
-  type: "compliance_submitted";
+  type: NotificationType;
+  title: string;
   message: string;
-  productRequestId: string;
-  productName: string;
-  supplierName: string;
-  distributorName: string;
+  productRequestId: string | null;
+  productName: string | null;
   createdAt: string;
   read: boolean;
 };
 
-const STORAGE_KEY = "scp-notifications";
-
-function readNotifications(): PortalNotification[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as PortalNotification[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+function toPortalNotification(notification: ApiNotification): PortalNotification {
+  return {
+    id: notification.id,
+    type: notification.type,
+    title: notification.title,
+    message: notification.message,
+    productRequestId: notification.productRequestId,
+    productName: notification.productRequest?.name ?? null,
+    createdAt: notification.createdAt,
+    read: notification.isRead,
+  };
 }
 
-function writeNotifications(notifications: PortalNotification[]) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-}
-
-export function useNotifications(distributorName?: string) {
+export function useNotifications() {
+  const { user } = useAuth();
   const [notifications, setNotifications] = useState<PortalNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchNotifications = useCallback(
+    async (pageNum: number, append = false) => {
+      if (!user) return;
+
+      try {
+        setError(null);
+        const result = await listNotifications({ page: pageNum, limit: 20 });
+        const mapped = result.items.map(toPortalNotification);
+
+        setNotifications((prev) => (append ? [...prev, ...mapped] : mapped));
+        setUnreadCount(result.unreadCount);
+        setPage(result.pagination.page);
+        setTotalPages(result.pagination.totalPages);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to load notifications",
+        );
+      } finally {
+        setReady(true);
+      }
+    },
+    [user],
+  );
 
   useEffect(() => {
-    setNotifications(readNotifications());
-    setReady(true);
-  }, []);
+    if (!user) {
+      setReady(true);
+      return;
+    }
 
-  function persist(next: PortalNotification[]) {
-    setNotifications(next);
-    writeNotifications(next);
-  }
+    setReady(false);
+    void fetchNotifications(1);
+  }, [user, fetchNotifications]);
 
-  function addNotification(
-    notification: Omit<PortalNotification, "id" | "createdAt" | "read">,
-  ) {
-    const entry: PortalNotification = {
-      ...notification,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      read: false,
-    };
-    persist([entry, ...readNotifications()]);
-  }
+  const markRead = useCallback(
+    async (id: string) => {
+      const target = notifications.find((item) => item.id === id);
+      if (!target || target.read) return;
 
-  const filtered = distributorName
-    ? notifications.filter((n) => n.distributorName === distributorName)
-    : notifications;
+      setNotifications((prev) =>
+        prev.map((item) => (item.id === id ? { ...item, read: true } : item)),
+      );
+      setUnreadCount((count) => Math.max(0, count - 1));
 
-  const unreadCount = filtered.filter((n) => !n.read).length;
+      try {
+        await markNotificationRead(id);
+      } catch {
+        void fetchNotifications(1);
+      }
+    },
+    [notifications, fetchNotifications],
+  );
 
-  function markRead(id: string) {
-    persist(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-  }
+  const markAllRead = useCallback(async () => {
+    const hadUnread = unreadCount > 0;
+
+    setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
+    setUnreadCount(0);
+
+    try {
+      await markAllNotificationsRead();
+    } catch {
+      if (hadUnread) {
+        void fetchNotifications(1);
+      }
+    }
+  }, [unreadCount, fetchNotifications]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || page >= totalPages) return;
+
+    setLoadingMore(true);
+    try {
+      await fetchNotifications(page + 1, true);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, page, totalPages, fetchNotifications]);
+
+  const refetch = useCallback(() => fetchNotifications(1), [fetchNotifications]);
 
   return {
     ready,
-    notifications: filtered,
+    notifications,
     unreadCount,
-    addNotification,
+    error,
     markRead,
+    markAllRead,
+    refetch,
+    hasMore: page < totalPages,
+    loadingMore,
+    loadMore,
   };
-}
-
-export function addComplianceNotification(params: {
-  productRequestId: string;
-  productName: string;
-  supplierName: string;
-  distributorName: string;
-}) {
-  const entry: PortalNotification = {
-    id: crypto.randomUUID(),
-    type: "compliance_submitted",
-    message: `${params.supplierName} submitted compliance documents for ${params.productName}.`,
-    productRequestId: params.productRequestId,
-    productName: params.productName,
-    supplierName: params.supplierName,
-    distributorName: params.distributorName,
-    createdAt: new Date().toISOString(),
-    read: false,
-  };
-  const existing = readNotifications();
-  writeNotifications([entry, ...existing]);
 }

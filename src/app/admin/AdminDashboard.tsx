@@ -11,6 +11,7 @@ import {
   HiOutlineUsers,
 } from "react-icons/hi2";
 import AppShell from "../../../components/layouts/AppShell";
+import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
 import EntityFormModal from "./EntityFormModal";
 import type {
   AdminEntity,
@@ -24,6 +25,7 @@ import {
   roleLabel,
 } from "./types";
 import { useAdminEntities } from "./useAdminEntities";
+import { useNotifications } from "@/lib/useNotifications";
 
 type ModalState =
   | { open: false }
@@ -142,6 +144,19 @@ function AdminDashboardInner() {
     deleteEntity,
   } = useAdminEntities();
 
+  const {
+    ready: notificationsReady,
+    notifications,
+    unreadCount,
+    error: notificationsError,
+    markRead,
+    markAllRead,
+    refetch: refetchNotifications,
+    hasMore: hasMoreNotifications,
+    loadingMore: loadingMoreNotifications,
+    loadMore: loadMoreNotifications,
+  } = useNotifications();
+
   const sectionParam = searchParams.get("section");
   const section: AdminSection =
     sectionParam && isAdminSection(sectionParam) ? sectionParam : "dashboard";
@@ -194,7 +209,7 @@ function AdminDashboardInner() {
       navItems={NAV_ITEMS}
       activeNavId={section}
       onNavigate={navigate}
-      notificationCount={0}
+      notificationCount={unreadCount}
     >
       {!ready ? (
         <div>
@@ -219,7 +234,18 @@ function AdminDashboardInner() {
       ) : section === "products" ? (
         <ProductsPlaceholder />
       ) : section === "notifications" ? (
-        <NotificationsPlaceholder />
+        <NotificationsInbox
+          notifications={notifications}
+          unreadCount={unreadCount}
+          loading={!notificationsReady}
+          error={notificationsError}
+          onMarkRead={markRead}
+          onMarkAllRead={markAllRead}
+          onRetry={refetchNotifications}
+          hasMore={hasMoreNotifications}
+          loadingMore={loadingMoreNotifications}
+          onLoadMore={loadMoreNotifications}
+        />
       ) : (
         <SettingsSection user={user} />
       )}
@@ -531,21 +557,6 @@ function ProductsPlaceholder() {
       <EmptyState
         title="No product requests yet"
         description="When distributors create requests, they will appear in this list."
-      />
-    </div>
-  );
-}
-
-function NotificationsPlaceholder() {
-  return (
-    <div>
-      <PageHeader
-        title="Notifications"
-        description="Inbox for request and user activity"
-      />
-      <EmptyState
-        title="You're all caught up"
-        description="New notifications will show here when activity starts."
       />
     </div>
   );

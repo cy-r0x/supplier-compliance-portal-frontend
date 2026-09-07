@@ -12,6 +12,7 @@ import {
 } from "react-icons/hi2";
 import { useNotifications } from "../../lib/useNotifications";
 import AppShell from "../../../components/layouts/AppShell";
+import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
 import EntityFormModal from "../admin/EntityFormModal";
 import type { AdminEntity, EntityFormValues } from "../admin/types";
 import { formatDate } from "../admin/types";
@@ -213,8 +214,18 @@ function DistributorDashboardInner() {
     approveRequest,
   } = useProductRequests();
 
-  const { ready: notificationsReady, notifications, unreadCount } =
-    useNotifications(distributorName);
+  const {
+    ready: notificationsReady,
+    notifications,
+    unreadCount,
+    error: notificationsError,
+    markRead,
+    markAllRead,
+    refetch: refetchNotifications,
+    hasMore: hasMoreNotifications,
+    loadingMore: loadingMoreNotifications,
+    loadMore: loadMoreNotifications,
+  } = useNotifications();
 
   const ready = entitiesReady && requestsReady && notificationsReady;
 
@@ -340,7 +351,18 @@ function DistributorDashboardInner() {
             onCreateSupplier={openCreateSupplier}
           />
         ) : (
-          <NotificationsSection notifications={notifications} />
+          <NotificationsInbox
+            notifications={notifications}
+            unreadCount={unreadCount}
+            loading={!notificationsReady}
+            error={notificationsError}
+            onMarkRead={markRead}
+            onMarkAllRead={markAllRead}
+            onRetry={refetchNotifications}
+            hasMore={hasMoreNotifications}
+            loadingMore={loadingMoreNotifications}
+            onLoadMore={loadMoreNotifications}
+          />
         )}
       </AppShell>
 
@@ -755,51 +777,6 @@ function ProductRequestsSection({
             </div>
           )}
         </>
-      )}
-    </div>
-  );
-}
-
-function NotificationsSection({
-  notifications,
-}: {
-  notifications: {
-    id: string;
-    message: string;
-    supplierName: string;
-    productName: string;
-    createdAt: string;
-    read: boolean;
-  }[];
-}) {
-  return (
-    <div>
-      <PageHeader
-        title="Notifications"
-        description="Inbox for request and user activity"
-      />
-      {notifications.length === 0 ? (
-        <EmptyState
-          title="You're all caught up"
-          description="New notifications will show here when activity starts."
-        />
-      ) : (
-        <ul className="divide-y divide-border-subtle overflow-hidden rounded-[12px] border border-border-subtle bg-bg-elevated">
-          {notifications.map((notification) => (
-            <li
-              key={notification.id}
-              className={`px-4 py-4 ${notification.read ? "" : "bg-brand-50/40"}`}
-            >
-              <p className="text-[13px] text-text-primary">
-                {notification.message}
-              </p>
-              <p className="mt-1 text-[12px] text-text-muted">
-                {notification.supplierName} · {notification.productName} ·{" "}
-                {formatDate(notification.createdAt)}
-              </p>
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );
