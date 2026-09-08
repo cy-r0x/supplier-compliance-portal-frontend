@@ -7,9 +7,9 @@ import type { ProductRequest } from "./types";
 
 type ProductQrCodeProps = {
   request: ProductRequest;
+  size?: number;
 };
 
-const DISPLAY_SIZE = 40;
 const RENDER_SIZE = 160;
 const EXPORT_SIZE = 1024;
 
@@ -21,10 +21,13 @@ function slugify(value: string) {
     .slice(0, 40);
 }
 
-export default function ProductQrCode({ request }: ProductQrCodeProps) {
+export default function ProductQrCode({ request, size = 32 }: ProductQrCodeProps) {
   const canvasId = useId();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const publicSlug = request.publicSlug ?? request.id;
+  const displaySize = Math.max(24, Math.min(48, size));
+  const publicSlug = request.publicSlug;
+  if (!publicSlug) return null;
+
   const publicUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/p/${publicSlug}`
@@ -54,7 +57,10 @@ export default function ProductQrCode({ request }: ProductQrCodeProps) {
   }
 
   return (
-    <div className="group relative shrink-0 rounded-[6px] border border-border-subtle bg-bg-elevated p-1">
+    <div
+      className="group relative inline-flex shrink-0 items-center justify-center rounded-[7px] border border-border-subtle bg-bg-elevated p-0.5"
+      style={{ width: displaySize + 4, height: displaySize + 4 }}
+    >
       <QRCodeCanvas
         id={canvasId}
         ref={canvasRef}
@@ -63,8 +69,8 @@ export default function ProductQrCode({ request }: ProductQrCodeProps) {
         level="H"
         marginSize={2}
         title={`QR code for ${request.productName}`}
-        className="block size-10"
-        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}
+        className="block"
+        style={{ width: displaySize, height: displaySize }}
       />
       <button
         type="button"
@@ -74,11 +80,11 @@ export default function ProductQrCode({ request }: ProductQrCodeProps) {
         }}
         aria-label={`Download QR code for ${request.productName}`}
         title="Download QR code"
-        className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-[5px] bg-text-primary/55 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-[6px] bg-text-primary/55 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
         <HiOutlineArrowDownTray
           aria-hidden="true"
-          className="size-5 text-text-inverse drop-shadow-sm"
+          className={`text-text-inverse drop-shadow-sm ${displaySize <= 32 ? "size-3.5" : "size-5"}`}
         />
       </button>
     </div>

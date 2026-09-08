@@ -1,15 +1,19 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../../lib/auth/AuthProvider";
 import {
   HiOutlineArrowRight,
   HiOutlineBell,
   HiOutlineBolt,
+  HiOutlineChevronRight,
   HiOutlineClipboardDocumentList,
+  HiOutlineEye,
   HiOutlineHome,
   HiOutlineMagnifyingGlass,
+  HiOutlinePencilSquare,
+  HiOutlineTrash,
   HiOutlineTruck,
   HiOutlineXMark,
 } from "react-icons/hi2";
@@ -168,7 +172,13 @@ function RequestStatusBadge({ request }: { request: ProductRequest }) {
   );
 }
 
-function ProgressCircle({ value }: { value: number }) {
+function progressHint(value: number): string {
+  if (value >= 100) return "Complete";
+  if (value <= 0) return "Not started";
+  return "In progress";
+}
+
+function ProgressCircle({ value, showLabel = false }: { value: number; showLabel?: boolean }) {
   const clamped = Math.min(100, Math.max(0, value));
   const size = 36;
   const stroke = 3.5;
@@ -177,44 +187,83 @@ function ProgressCircle({ value }: { value: number }) {
   const offset = circumference - (clamped / 100) * circumference;
 
   return (
-    <div
-      className="relative inline-flex size-9 items-center justify-center"
-      role="img"
-      aria-label={`${clamped}% complete`}
-    >
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="-rotate-90"
-        aria-hidden="true"
+    <div className="flex items-center gap-2.5">
+      <div
+        className="relative inline-flex size-9 shrink-0 items-center justify-center"
+        role="img"
+        aria-label={`${clamped}% complete`}
       >
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={stroke}
-          className="text-bg-muted"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          className="text-brand-500 transition-[stroke-dashoffset] duration-150"
-        />
-      </svg>
-      <span className="absolute font-mono text-[9px] font-medium text-text-primary">
-        {clamped}%
-      </span>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          className="-rotate-90"
+          aria-hidden="true"
+        >
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={stroke}
+            className="text-bg-muted"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            className={`transition-[stroke-dashoffset] duration-150 ${
+              clamped >= 100 ? "text-brand-600" : "text-brand-500"
+            }`}
+          />
+        </svg>
+        <span className="absolute font-mono text-[9px] font-medium text-text-primary">
+          {clamped}%
+        </span>
+      </div>
+      {showLabel ? (
+        <span className="text-[12px] text-text-secondary">{progressHint(clamped)}</span>
+      ) : null}
     </div>
+  );
+}
+
+function TableActionButton({
+  label,
+  icon,
+  onClick,
+  variant = "ghost",
+}: {
+  label: string;
+  icon: ReactNode;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  variant?: "ghost" | "primary" | "danger";
+}) {
+  const styles =
+    variant === "primary"
+      ? "bg-brand-500 text-text-inverse hover:bg-brand-600"
+      : variant === "danger"
+        ? "text-danger-500 hover:bg-danger-50"
+        : "text-text-secondary hover:bg-bg-muted hover:text-text-primary";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`inline-flex h-8 cursor-pointer items-center justify-center gap-1.5 rounded-[7px] px-2.5 text-[12px] font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring ${styles}`}
+    >
+      {icon}
+      {variant !== "danger" ? <span>{label}</span> : null}
+    </button>
   );
 }
 
@@ -808,70 +857,133 @@ function ProductRequestActions({
   onEdit,
   onDelete,
   onView,
+  layout = "table",
 }: {
   request: ProductRequest;
   onEdit: (request: ProductRequest) => void;
   onDelete: (request: ProductRequest) => void;
   onView: (request: ProductRequest) => void;
+  layout?: "table" | "compact";
 }) {
+  const stop = (event: MouseEvent) => event.stopPropagation();
+
   if (request.apiStatus === "PENDING") {
     return (
-      <div className="flex flex-wrap items-center justify-end gap-1">
-        <button
-          type="button"
+      <div
+        className={`inline-flex items-center rounded-[8px] border border-border-subtle bg-bg-muted/30 p-0.5 ${
+          layout === "compact" ? "flex-wrap justify-end" : ""
+        }`}
+      >
+        <TableActionButton
+          label="Edit"
+          icon={<HiOutlinePencilSquare aria-hidden="true" className="size-3.5" />}
           onClick={(event) => {
-            event.stopPropagation();
+            stop(event);
             onEdit(request);
           }}
-          className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
+        />
+        <TableActionButton
+          label="Delete"
+          variant="danger"
+          icon={<HiOutlineTrash aria-hidden="true" className="size-3.5" />}
           onClick={(event) => {
-            event.stopPropagation();
+            stop(event);
             onDelete(request);
           }}
-          className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          Delete
-        </button>
+        />
       </div>
     );
   }
 
+  const viewLabel =
+    request.apiStatus === "SUBMITTED" ? "Review" : "View submission";
+  const viewVariant = request.apiStatus === "SUBMITTED" ? "primary" : "ghost";
+  const showQr =
+    request.apiStatus === "APPROVED" && Boolean(request.publicSlug);
+
   return (
-    <div className="flex items-center justify-end gap-2">
-      {request.apiStatus === "SUBMITTED" ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onView(request);
-          }}
-          className="cursor-pointer rounded-[7px] bg-brand-500 px-2.5 py-1.5 text-[12px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          Review
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            onView(request);
-          }}
-          className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-        >
-          View submission
-        </button>
-      )}
-      {request.apiStatus === "APPROVED" && request.publicSlug ? (
-        <div onClick={(event) => event.stopPropagation()}>
-          <ProductQrCode request={request} />
-        </div>
-      ) : null}
+    <div
+      className={`inline-flex items-center gap-2 ${
+        layout === "compact" ? "flex-wrap justify-end" : "justify-end"
+      }`}
+    >
+      <TableActionButton
+        label={viewLabel}
+        variant={viewVariant}
+        icon={
+          request.apiStatus === "SUBMITTED" ? (
+            <HiOutlineClipboardDocumentList aria-hidden="true" className="size-3.5" />
+          ) : (
+            <HiOutlineEye aria-hidden="true" className="size-3.5" />
+          )
+        }
+        onClick={(event) => {
+          stop(event);
+          onView(request);
+        }}
+      />
+      {showQr ? <ProductQrCode request={request} size={32} /> : null}
     </div>
+  );
+}
+
+function ProductRequestTableRow({
+  request,
+  onOpen,
+  onEdit,
+  onDelete,
+  onView,
+}: {
+  request: ProductRequest;
+  onOpen: (request: ProductRequest) => void;
+  onEdit: (request: ProductRequest) => void;
+  onDelete: (request: ProductRequest) => void;
+  onView: (request: ProductRequest) => void;
+}) {
+  return (
+    <tr
+      className="group cursor-pointer transition-colors duration-150 hover:bg-bg-muted/40"
+      onClick={() => onOpen(request)}
+    >
+      <td className="px-4 py-3">
+        <div className="flex min-w-[220px] items-center gap-3">
+          <ProductThumbnail src={request.productImage} size={44} fit="cover" />
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-medium text-text-primary">
+              {request.productName}
+            </p>
+            <p className="mt-0.5 truncate text-[12px] text-text-secondary">
+              {request.supplierName}
+            </p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <ProgressCircle value={request.progress} showLabel />
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 font-mono text-[12px] text-text-muted">
+        {formatDate(request.requestedAt)}
+      </td>
+      <td className="px-4 py-3">
+        <RequestStatusBadge request={request} />
+      </td>
+      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-end">
+          <ProductRequestActions
+            request={request}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onView={onView}
+          />
+        </div>
+      </td>
+      <td className="w-8 px-2 py-3">
+        <HiOutlineChevronRight
+          aria-hidden="true"
+          className="size-4 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+        />
+      </td>
+    </tr>
   );
 }
 
@@ -927,6 +1039,7 @@ function ProductRequestMobileCard({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onView={onView}
+                layout="compact"
               />
             </div>
           </div>
@@ -1230,63 +1343,35 @@ function ProductRequestsSection({
                 ))}
               </div>
 
-              <div className="hidden overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated md:block">
-                <table className="min-w-full text-left text-[13px]">
-                  <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
-                    <tr>
-                      <th className="px-4 py-2.5 font-medium">Product</th>
-                      <th className="px-4 py-2.5 font-medium">Progress</th>
-                      <th className="px-4 py-2.5 font-medium">Supplier</th>
-                      <th className="px-4 py-2.5 font-medium">Date of request</th>
-                      <th className="px-4 py-2.5 font-medium">Status</th>
-                      <th className="px-4 py-2.5 font-medium">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
-                    {filtered.map((request) => (
-                      <tr
-                        key={request.id}
-                        className="h-14 cursor-pointer transition-colors duration-150 hover:bg-bg-muted/40"
-                        onClick={() => openRequest(request)}
-                      >
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-3">
-                            <ProductThumbnail
-                              src={request.productImage}
-                              size={40}
-                              fit="cover"
-                            />
-                            <span className="font-medium text-text-primary">
-                              {request.productName}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2">
-                          <ProgressCircle value={request.progress} />
-                        </td>
-                        <td className="px-4 py-2 text-text-secondary">
-                          {request.supplierName}
-                        </td>
-                        <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
-                          {formatDate(request.requestedAt)}
-                        </td>
-                        <td className="px-4 py-2">
-                          <RequestStatusBadge request={request} />
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <ProductRequestActions
-                            request={request}
-                            onEdit={onEdit}
-                            onDelete={onDelete}
-                            onView={onView}
-                          />
-                        </td>
+              <div className="hidden overflow-hidden rounded-[12px] border border-border-subtle bg-bg-elevated md:block">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-left text-[13px]">
+                    <thead className="border-b border-border-subtle bg-bg-muted/50 text-[11px] font-medium tracking-[0.02em] text-text-muted uppercase">
+                      <tr>
+                        <th className="px-4 py-3">Product</th>
+                        <th className="px-4 py-3">Progress</th>
+                        <th className="px-4 py-3">Requested</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Actions</th>
+                        <th className="w-8 px-2 py-3">
+                          <span className="sr-only">Open</span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                      {filtered.map((request) => (
+                        <ProductRequestTableRow
+                          key={request.id}
+                          request={request}
+                          onOpen={openRequest}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onView={onView}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}
