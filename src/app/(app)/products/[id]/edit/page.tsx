@@ -2,6 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams } from "next/navigation";
+import { ProductFormPageSkeleton } from "@/components/loading/page-skeletons";
 import ProductSetupPage from "@/components/products/ProductSetupPage";
 
 function EditProductRequestContent() {
@@ -13,13 +14,7 @@ function EditProductRequestContent() {
 
 export default function EditProductRequestPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={<ProductFormPageSkeleton />}>
       <EditProductRequestContent />
     </Suspense>
   );

@@ -16,6 +16,7 @@ import {
   notifyTokensUpdated,
   registerAuthEventHandlers,
 } from "./auth-events";
+import { getCurrentUser, type ApiUser } from "../api/users-api";
 import type { AuthUser } from "./session";
 import { decodeAccessToken, getUserFromStoredToken } from "./session";
 import {
@@ -30,9 +31,28 @@ type AuthContextValue = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   clearSession: () => void;
+  updateUser: (patch: Partial<AuthUser>) => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function mergeProfile(user: AuthUser, profile: ApiUser): AuthUser {
+  return {
+    ...user,
+    name: profile.name,
+    email: profile.email,
+    photo: profile.photo,
+  };
+}
+
+async function hydrateUserProfile(user: AuthUser): Promise<AuthUser> {
+  try {
+    const profile = await getCurrentUser();
+    return mergeProfile(user, profile);
+  } catch {
+    return user;
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -58,8 +78,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    setUser(getUserFromStoredToken());
-    setIsLoading(false);
+    const initial = getUserFromStoredToken();
+    if (!initial) {
+      setIsLoading(false);
+      return;
+    }
+
+    setUser(initial);
+
+    void hydrateUserProfile(initial)
+      .then(setUser)
+      .finally(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   const login = useCallback(
@@ -73,8 +104,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Invalid access token");
       }
 
-      setUser(nextUser);
-      notifyTokensUpdated(tokens.accessToken, nextUser);
+      const hydratedUser = await hydrateUserProfile(nextUser);
+      setUser(hydratedUser);
+      notifyTokensUpdated(tokens.accessToken, hydratedUser);
       router.replace("/dashboard");
     },
     [router],
@@ -91,9 +123,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.replace("/login");
   }, [router]);
 
+  const updateUser = useCallback((patch: Partial<AuthUser>) => {
+    setUser((current) => (current ? { ...current, ...patch } : current));
+  }, []);
+
   const value = useMemo(
-    () => ({ user, isLoading, login, logout, clearSession }),
-    [user, isLoading, login, logout, clearSession],
+    () => ({ user, isLoading, login, logout, clearSession, updateUser }),
+    [user, isLoading, login, logout, clearSession, updateUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

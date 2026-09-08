@@ -19,6 +19,7 @@ import type {
 } from "@/lib/products/map-product";
 import { apiDetailToProductRequest } from "@/lib/products/map-product";
 import { useProductRequests } from "@/app/distributor/useProductRequests";
+import { ComplianceFormPageSkeleton } from "@/components/loading/page-skeletons";
 
 const TYPE_TO_ACCEPT = Object.fromEntries(
   DOCUMENT_FIELD_CONFIG.map(({ key, accept }) => {
@@ -168,11 +169,7 @@ export default function ProductCompliancePage() {
   }, [requestId, getProductDetail]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-        Loading…
-      </div>
-    );
+    return <ComplianceFormPageSkeleton />;
   }
 
   if (loadError || !product) {

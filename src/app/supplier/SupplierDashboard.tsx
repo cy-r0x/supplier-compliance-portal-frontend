@@ -12,6 +12,11 @@ import {
 import AppShell from "../../../components/layouts/AppShell";
 import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
 import UserSettingsPage from "@/components/settings/UserSettingsPage";
+import { Skeleton, SkeletonRows } from "@/components/loading/Skeleton";
+import {
+  AppWorkspaceSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/loading/page-skeletons";
 import { formatDate } from "../admin/types";
 import type { ProductRequest } from "../distributor/types";
 import { useProductRequests } from "../distributor/useProductRequests";
@@ -83,19 +88,6 @@ function EmptyState({
   );
 }
 
-function SkeletonRows() {
-  return (
-    <div className="space-y-2" aria-hidden="true">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-11 animate-pulse rounded-[9px] bg-bg-muted"
-        />
-      ))}
-    </div>
-  );
-}
-
 function ProgressCircle({ value }: { value: number }) {
   const clamped = Math.min(100, Math.max(0, value));
   const size = 36;
@@ -148,13 +140,7 @@ function ProgressCircle({ value }: { value: number }) {
 
 export function SupplierDashboard() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={<AppWorkspaceSkeleton label="Loading dashboard" />}>
       <SupplierDashboardInner />
     </Suspense>
   );
@@ -228,9 +214,15 @@ function SupplierDashboardInner() {
         notificationCount={unreadCount}
       >
         {!ready ? (
-          <div>
-            <PageHeader title="Dashboard" description="Loading…" />
-            <SkeletonRows />
+          <div role="status" aria-busy="true" aria-live="polite">
+            <PageHeaderSkeleton action />
+            <div className="mt-4 rounded-[12px] border border-border-subtle bg-bg-elevated p-4">
+              <Skeleton className="h-10 w-full max-w-sm" />
+              <div className="mt-4">
+                <SkeletonRows count={4} height="h-14" />
+              </div>
+            </div>
+            <span className="sr-only">Loading dashboard</span>
           </div>
         ) : section === "dashboard" ? (
           <DashboardSection
@@ -258,7 +250,7 @@ function SupplierDashboardInner() {
             onLoadMore={loadMoreNotifications}
           />
         ) : (
-          <UserSettingsPage user={user} />
+          <UserSettingsPage />
         )}
       </AppShell>
     </div>

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { AppWorkspaceSkeleton } from "@/components/loading/page-skeletons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -15,11 +16,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [isLoading, user, router]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-        Loading…
-      </div>
-    );
+    return <AppWorkspaceSkeleton label="Preparing your workspace" />;
   }
 
   if (!user) {

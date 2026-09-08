@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { IconType } from "react-icons";
@@ -9,6 +8,7 @@ import {
   HiOutlineChevronDoubleLeft,
   HiOutlineChevronDoubleRight,
 } from "react-icons/hi2";
+import UserAvatar from "@/components/user/UserAvatar";
 import { useAuth } from "../../src/lib/auth/AuthProvider";
 
 const COLLAPSE_STORAGE_KEY = "scp-sidebar-collapsed";
@@ -66,7 +66,6 @@ export default function AppShell({
 
   const userName = user?.name ?? "";
   const userRole = user?.role ?? "";
-  const avatarSrc = user?.photo || "/Images/avatar.jpg";
 
   useEffect(() => {
     try {
@@ -187,14 +186,7 @@ export default function AppShell({
                   </p>
                   <p className="truncate text-[11px] text-text-muted">{userRole}</p>
                 </div>
-                <Image
-                  src={avatarSrc}
-                  alt=""
-                  width={32}
-                  height={32}
-                  priority
-                  className="size-8 rounded-full object-cover outline outline-border-subtle"
-                />
+                <UserAvatar src={user?.photo} size={32} />
               </button>
 
               <div

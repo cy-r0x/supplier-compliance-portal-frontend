@@ -1,17 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
+import { ProductFormPageSkeleton } from "@/components/loading/page-skeletons";
 import NewProductRequestPage from "./NewProductRequestPage";
 
 export default function NewProductPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={<ProductFormPageSkeleton />}>
       <NewProductRequestPage />
     </Suspense>
   );

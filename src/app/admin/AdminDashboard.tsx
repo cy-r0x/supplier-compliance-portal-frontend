@@ -27,6 +27,11 @@ import {
 import { useAdminEntities } from "./useAdminEntities";
 import { useNotifications } from "@/lib/useNotifications";
 import UserSettingsPage from "@/components/settings/UserSettingsPage";
+import { Skeleton, SkeletonRows } from "@/components/loading/Skeleton";
+import {
+  AppWorkspaceSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/loading/page-skeletons";
 import { useProductRequests } from "../distributor/useProductRequests";
 import type { ProductRequest } from "../distributor/types";
 import { statusLabel } from "../distributor/types";
@@ -105,28 +110,9 @@ function EmptyState({
   );
 }
 
-function SkeletonRows() {
-  return (
-    <div className="space-y-2" aria-hidden="true">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-11 animate-pulse rounded-[9px] bg-bg-muted"
-        />
-      ))}
-    </div>
-  );
-}
-
 export function AdminDashboard() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={<AppWorkspaceSkeleton label="Loading dashboard" />}>
       <AdminDashboardInner />
     </Suspense>
   );
@@ -235,9 +221,15 @@ function AdminDashboardInner() {
       notificationCount={unreadCount}
     >
       {!ready ? (
-        <div>
-          <PageHeader title="Dashboard" description="Loading…" />
-          <SkeletonRows />
+        <div role="status" aria-busy="true" aria-live="polite">
+          <PageHeaderSkeleton action />
+          <div className="mt-4 rounded-[12px] border border-border-subtle bg-bg-elevated p-4">
+            <Skeleton className="h-10 w-full max-w-sm" />
+            <div className="mt-4">
+              <SkeletonRows count={4} height="h-14" />
+            </div>
+          </div>
+          <span className="sr-only">Loading dashboard</span>
         </div>
       ) : section === "dashboard" ? (
         <DashboardSection
@@ -279,7 +271,7 @@ function AdminDashboardInner() {
           onLoadMore={loadMoreNotifications}
         />
       ) : (
-        <UserSettingsPage user={user} />
+        <UserSettingsPage />
       )}
 
       <EntityFormModal

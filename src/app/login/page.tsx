@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LogInPage from "../../../components/pages/LogInPage";
+import { LoginPageSkeleton } from "@/components/loading/page-skeletons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 
 export default function LoginPage() {
@@ -16,11 +17,7 @@ export default function LoginPage() {
   }, [isLoading, user, router]);
 
   if (isLoading || user) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-        Loading…
-      </div>
-    );
+    return <LoginPageSkeleton />;
   }
 
   return (

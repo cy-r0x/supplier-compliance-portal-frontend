@@ -10,6 +10,7 @@ import {
   usePdfPreview,
 } from "../../../components/documents/pdf-preview";
 import { RequirementToggles } from "@/components/products/RequirementToggles";
+import { ProductFormPageSkeleton } from "@/components/loading/page-skeletons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { listUsers } from "@/lib/api/users-api";
 import {
@@ -131,12 +132,8 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
     );
   }
 
-  if (loadingProduct) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-        Loading…
-      </div>
-    );
+  if (loadingProduct || (!isEdit && loadingSuppliers)) {
+    return <ProductFormPageSkeleton />;
   }
 
   function updateDocument(

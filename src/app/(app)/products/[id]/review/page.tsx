@@ -20,6 +20,7 @@ import {
 import type { ApiProductDetail } from "@/lib/products/map-product";
 import { apiDetailToProductRequest } from "@/lib/products/map-product";
 import { isEmptyHtml } from "@/lib/html";
+import { ProductReviewPageSkeleton } from "@/components/loading/page-skeletons";
 
 function RichTextContent({ html }: { html: string }) {
   if (isEmptyHtml(html)) {
@@ -102,11 +103,7 @@ export default function ProductReviewPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
-        Loading…
-      </div>
-    );
+    return <ProductReviewPageSkeleton />;
   }
 
   if (error || !product) {

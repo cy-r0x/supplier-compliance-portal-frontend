@@ -41,6 +41,16 @@ export async function listUsers(
   return { items: data.data, pagination: data.pagination };
 }
 
+export async function getCurrentUser(): Promise<ApiUser> {
+  const { data } = await api.get<ApiResponse<ApiUser>>("/users/me");
+
+  if (!data.success) {
+    throw new ApiError(data.message);
+  }
+
+  return data.data;
+}
+
 export type CreateUserInput = {
   name: string;
   email: string;
@@ -60,6 +70,22 @@ export async function createUser(input: CreateUserInput): Promise<ApiUser> {
   }
 
   const { data } = await api.post<ApiResponse<ApiUser>>("/users", form);
+
+  if (!data.success) {
+    throw new ApiError(data.message);
+  }
+
+  return data.data;
+}
+
+export async function updateMyProfilePhoto(photo: File): Promise<ApiUser> {
+  const form = new FormData();
+  form.append("photo", photo);
+
+  const { data } = await api.patch<ApiResponse<ApiUser>>(
+    "/users/me/photo",
+    form,
+  );
 
   if (!data.success) {
     throw new ApiError(data.message);
