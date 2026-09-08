@@ -8,11 +8,7 @@ import {
   useState,
 } from "react";
 import type { AdminEntity } from "../admin/types";
-import type {
-  ProductRequest,
-  ProductRequestFormValues,
-  ProductRequestStatus,
-} from "./types";
+import type { ProductRequest, ProductRequestFormValues } from "./types";
 
 type ProductRequestModalProps = {
   open: boolean;
@@ -20,18 +16,23 @@ type ProductRequestModalProps = {
   suppliers: AdminEntity[];
   initial?: ProductRequest | null;
   onClose: () => void;
-  onSubmit: (values: ProductRequestFormValues, supplierName: string) => void;
+  onSubmit: (
+    values: ProductRequestFormValues,
+    supplierName: string,
+  ) => Promise<void>;
 };
 
 const emptyValues: ProductRequestFormValues = {
   productName: "",
   productImage: "",
-  progress: 0,
   supplierId: "",
   status: "pending",
+  sku: "",
+  price: undefined,
+  photoFile: null,
 };
 
-type FieldErrors = Partial<Record<keyof ProductRequestFormValues, string>>;
+type FieldErrors = Partial<Record<string, string>>;
 
 function fieldClass(invalid?: boolean) {
   return `mt-1.5 h-11 w-full rounded-[9px] border bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:ring-2 disabled:opacity-60 ${
@@ -51,14 +52,15 @@ export default function ProductRequestModal({
 }: ProductRequestModalProps) {
   const titleId = useId();
   const nameId = useId();
-  const imageId = useId();
-  const progressId = useId();
+  const skuId = useId();
+  const priceId = useId();
+  const photoId = useId();
   const supplierId = useId();
-  const statusId = useId();
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
   const [values, setValues] = useState<ProductRequestFormValues>(emptyValues);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -68,9 +70,11 @@ export default function ProductRequestModal({
         ? {
             productName: initial.productName,
             productImage: initial.productImage,
-            progress: initial.progress,
             supplierId: initial.supplierId,
             status: initial.status,
+            sku: "",
+            price: undefined,
+            photoFile: null,
           }
         : {
             ...emptyValues,
@@ -78,6 +82,7 @@ export default function ProductRequestModal({
           },
     );
     setErrors({});
+    setFormError(null);
     setSaving(false);
     const frame = window.requestAnimationFrame(() => {
       firstFieldRef.current?.focus();
@@ -100,17 +105,10 @@ export default function ProductRequestModal({
     const next: FieldErrors = {};
     if (!values.productName.trim()) next.productName = "Product name is required";
     if (!values.supplierId) next.supplierId = "Select a supplier";
-    if (
-      !Number.isFinite(values.progress) ||
-      values.progress < 0 ||
-      values.progress > 100
-    ) {
-      next.progress = "Progress must be between 0 and 100";
-    }
     return next;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const nextErrors = validate();
     setErrors(nextErrors);
@@ -123,17 +121,26 @@ export default function ProductRequestModal({
     }
 
     setSaving(true);
-    onSubmit(
-      {
-        productName: values.productName.trim(),
-        productImage: values.productImage.trim(),
-        progress: Math.round(values.progress),
-        supplierId: values.supplierId,
-        status: values.status,
-      },
-      supplier.name,
-    );
-    onClose();
+    setFormError(null);
+    try {
+      await onSubmit(
+        {
+          productName: values.productName.trim(),
+          productImage: values.productImage,
+          supplierId: values.supplierId,
+          status: "pending",
+          sku: values.sku,
+          price: values.price,
+          photoFile: values.photoFile,
+        },
+        supplier.name,
+      );
+      onClose();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to save request");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -161,10 +168,7 @@ export default function ProductRequestModal({
 
         <form className="mt-5 space-y-4" noValidate onSubmit={handleSubmit}>
           <div>
-            <label
-              htmlFor={nameId}
-              className="block text-[12px] font-medium text-text-primary"
-            >
+            <label htmlFor={nameId} className="block text-[12px] font-medium text-text-primary">
               Product name <span className="text-brand-600">*</span>
             </label>
             <input
@@ -175,10 +179,7 @@ export default function ProductRequestModal({
               disabled={saving}
               aria-invalid={errors.productName ? true : undefined}
               onChange={(event) => {
-                setValues((prev) => ({
-                  ...prev,
-                  productName: event.target.value,
-                }));
+                setValues((prev) => ({ ...prev, productName: event.target.value }));
                 if (errors.productName)
                   setErrors((prev) => ({ ...prev, productName: undefined }));
               }}
@@ -193,46 +194,74 @@ export default function ProductRequestModal({
           </div>
 
           <div>
-            <label
-              htmlFor={imageId}
-              className="block text-[12px] font-medium text-text-primary"
-            >
-              Product image URL
+            <label htmlFor={skuId} className="block text-[12px] font-medium text-text-primary">
+              SKU
             </label>
             <input
-              id={imageId}
-              type="url"
-              value={values.productImage}
+              id={skuId}
+              value={values.sku ?? ""}
               disabled={saving}
               onChange={(event) =>
-                setValues((prev) => ({
-                  ...prev,
-                  productImage: event.target.value,
-                }))
+                setValues((prev) => ({ ...prev, sku: event.target.value }))
               }
               className={fieldClass()}
-              placeholder="https://… (optional)"
+              placeholder="Optional"
             />
           </div>
 
           <div>
-            <label
-              htmlFor={supplierId}
-              className="block text-[12px] font-medium text-text-primary"
-            >
+            <label htmlFor={priceId} className="block text-[12px] font-medium text-text-primary">
+              Price
+            </label>
+            <input
+              id={priceId}
+              type="number"
+              min={0}
+              step="0.01"
+              value={values.price ?? ""}
+              disabled={saving}
+              onChange={(event) =>
+                setValues((prev) => ({
+                  ...prev,
+                  price: event.target.value ? Number(event.target.value) : undefined,
+                }))
+              }
+              className={fieldClass()}
+              placeholder="Optional"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={photoId} className="block text-[12px] font-medium text-text-primary">
+              Product photo
+            </label>
+            <input
+              id={photoId}
+              type="file"
+              accept="image/*"
+              disabled={saving}
+              onChange={(event) =>
+                setValues((prev) => ({
+                  ...prev,
+                  photoFile: event.target.files?.[0] ?? null,
+                }))
+              }
+              className="mt-1.5 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
+            />
+          </div>
+
+          <div>
+            <label htmlFor={supplierId} className="block text-[12px] font-medium text-text-primary">
               Supplier <span className="text-brand-600">*</span>
             </label>
             <select
               id={supplierId}
               required
               value={values.supplierId}
-              disabled={saving || suppliers.length === 0}
+              disabled={saving || suppliers.length === 0 || mode === "edit"}
               aria-invalid={errors.supplierId ? true : undefined}
               onChange={(event) => {
-                setValues((prev) => ({
-                  ...prev,
-                  supplierId: event.target.value,
-                }));
+                setValues((prev) => ({ ...prev, supplierId: event.target.value }));
                 if (errors.supplierId)
                   setErrors((prev) => ({ ...prev, supplierId: undefined }));
               }}
@@ -255,84 +284,25 @@ export default function ProductRequestModal({
             ) : null}
           </div>
 
-          <div>
-            <label
-              htmlFor={progressId}
-              className="block text-[12px] font-medium text-text-primary"
-            >
-              Progress (%) <span className="text-brand-600">*</span>
-            </label>
-            <input
-              id={progressId}
-              required
-              type="number"
-              min={0}
-              max={100}
-              value={values.progress}
-              disabled={saving}
-              aria-invalid={errors.progress ? true : undefined}
-              onChange={(event) => {
-                setValues((prev) => ({
-                  ...prev,
-                  progress: Number(event.target.value),
-                }));
-                if (errors.progress)
-                  setErrors((prev) => ({ ...prev, progress: undefined }));
-              }}
-              className={fieldClass(Boolean(errors.progress))}
-            />
-            {errors.progress ? (
-              <p role="alert" className="mt-1.5 text-[12px] text-danger-500">
-                {errors.progress}
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <label
-              htmlFor={statusId}
-              className="block text-[12px] font-medium text-text-primary"
-            >
-              Status <span className="text-brand-600">*</span>
-            </label>
-            <select
-              id={statusId}
-              required
-              value={values.status}
-              disabled={saving}
-              onChange={(event) =>
-                setValues((prev) => ({
-                  ...prev,
-                  status: event.target.value as ProductRequestStatus,
-                }))
-              }
-              className={fieldClass()}
-            >
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
+          {formError ? (
+            <p role="alert" className="text-[12px] text-danger-500">{formError}</p>
+          ) : null}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="h-10 cursor-pointer rounded-[9px] px-4 text-[13px] font-medium text-text-primary transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
+              className="h-10 cursor-pointer rounded-[9px] px-4 text-[13px] font-medium text-text-primary transition-colors duration-150 hover:bg-bg-muted"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving || suppliers.length === 0}
-              className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-70"
+              className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {saving
-                ? "Saving…"
-                : mode === "create"
-                  ? "Create request"
-                  : "Save changes"}
+              {saving ? "Saving…" : mode === "create" ? "Create request" : "Save changes"}
             </button>
           </div>
         </form>

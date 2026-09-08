@@ -8,17 +8,6 @@ type ProductQrCodeProps = {
   request: ProductRequest;
 };
 
-function buildQrPayload(request: ProductRequest) {
-  return JSON.stringify({
-    id: request.id,
-    product: request.productName,
-    supplier: request.supplierName,
-    distributor: request.distributorName,
-    status: request.status,
-    requestedAt: request.requestedAt,
-  });
-}
-
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -30,7 +19,11 @@ function slugify(value: string) {
 export default function ProductQrCode({ request }: ProductQrCodeProps) {
   const canvasId = useId();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const payload = buildQrPayload(request);
+  const publicSlug = request.publicSlug ?? request.id;
+  const publicUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/p/${publicSlug}`
+      : `/p/${publicSlug}`;
 
   function handleDownload() {
     const canvas =
@@ -50,7 +43,7 @@ export default function ProductQrCode({ request }: ProductQrCodeProps) {
         <QRCodeCanvas
           id={canvasId}
           ref={canvasRef}
-          value={payload}
+          value={publicUrl}
           size={40}
           level="M"
           marginSize={1}

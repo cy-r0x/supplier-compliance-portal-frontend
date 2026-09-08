@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import TiptapEditor from "../../../../../components/editor/TiptapEditor";
 import {
@@ -10,63 +10,56 @@ import {
   PdfPreviewModal,
   usePdfPreview,
 } from "../../../../../components/documents/pdf-preview";
+import { DOCUMENT_FIELD_CONFIG } from "@/lib/compliance";
 import { isEmptyHtml } from "@/lib/html";
-import {
-  DOCUMENT_FIELD_CONFIG,
-  TEXT_FIELD_CONFIG,
-  emptyComplianceSubmission,
-  normalizeComplianceSubmission,
-  type ComplianceDocumentField,
-  type ComplianceDocuments,
-  type ComplianceSubmission,
-  type ComplianceTextField,
-  type ComplianceTextFields,
-} from "@/lib/compliance";
-import {
-  getComplianceSubmissionById,
-} from "@/lib/product-request-store";
+import type {
+  ApiDocumentRequirement,
+  ApiFieldRequirement,
+  ApiProductDetail,
+} from "@/lib/products/map-product";
+import { apiDetailToProductRequest } from "@/lib/products/map-product";
 import { useProductRequests } from "@/app/distributor/useProductRequests";
 
-function FieldCheckboxes({
-  required,
-  isPublic,
-  onRequiredChange,
-  onPublicChange,
+const TYPE_TO_ACCEPT = Object.fromEntries(
+  DOCUMENT_FIELD_CONFIG.map(({ key, accept }) => {
+    const typeMap: Record<string, string> = {
+      testReport: "TEST_REPORT",
+      declarationOfConformity: "DECLARATION_OF_CONFORMITY",
+      manualOrInstructions: "MANUAL_OR_INSTRUCTIONS",
+      certificate: "CERTIFICATE",
+      productImage: "PRODUCT_IMAGE",
+      safetyImage: "SAFETY_IMAGE",
+      regulatoryDocument: "REGULATORY_DOCUMENT",
+      other: "OTHER",
+    };
+    return [typeMap[key], accept];
+  }),
+);
+
+function RequirementMeta({
+  level,
+  visibility,
 }: {
-  required: boolean;
-  isPublic: boolean;
-  onRequiredChange: (checked: boolean) => void;
-  onPublicChange: (checked: boolean) => void;
+  level: "REQUIRED" | "OPTIONAL";
+  visibility: "PUBLIC" | "PRIVATE";
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-3">
-      <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-text-secondary">
-        <input
-          type="checkbox"
-          checked={required}
-          onChange={(event) => onRequiredChange(event.target.checked)}
-          className="size-3.5 rounded border-border-subtle text-brand-600 focus:ring-focus-ring"
-        />
-        Required
-      </label>
-      <label className="inline-flex cursor-pointer items-center gap-1.5 text-[11px] text-text-secondary">
-        <input
-          type="checkbox"
-          checked={isPublic}
-          onChange={(event) => onPublicChange(event.target.checked)}
-          className="size-3.5 rounded border-border-subtle text-brand-600 focus:ring-focus-ring"
-        />
-        Public
-      </label>
+    <div className="flex shrink-0 flex-wrap gap-2">
+      <span className="rounded-[6px] bg-bg-inset px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+        {level === "REQUIRED" ? "Required" : "Optional"}
+      </span>
+      <span className="rounded-[6px] bg-bg-inset px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+        {visibility === "PUBLIC" ? "Public" : "Private"}
+      </span>
     </div>
   );
 }
 
 function SubmitSuccessTooltip({
-  requestId,
+  publicSlug,
   onClose,
 }: {
-  requestId: string;
+  publicSlug: string;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -94,14 +87,14 @@ function SubmitSuccessTooltip({
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-medium text-text-primary">Submitted successfully</p>
           <p className="mt-1 text-[12px] text-text-secondary">
-            After distributor approval, public and required fields will appear on{" "}
+            After distributor approval, public fields will appear on{" "}
             <Link
-              href={`/p/${requestId}`}
+              href={`/p/${publicSlug}`}
               className="font-medium text-brand-600 hover:text-brand-700"
             >
-              /p/{requestId}
+              /p/{publicSlug}
             </Link>
-            . The form has been reset.
+            .
           </p>
         </div>
         <button
@@ -126,31 +119,66 @@ function SubmitSuccessTooltip({
 
 export default function ProductCompliancePage() {
   const params = useParams();
+  const router = useRouter();
   const requestId = typeof params.id === "string" ? params.id : "";
 
-  const { ready, requests, submitCompliance } = useProductRequests();
+  const { getProductDetail, submitCompliance } = useProductRequests();
 
-  const request = requests.find((item) => item.id === requestId);
-
-  const [values, setValues] = useState<ComplianceSubmission>(
-    emptyComplianceSubmission(),
-  );
+  const [product, setProduct] = useState<ApiProductDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const [documentFiles, setDocumentFiles] = useState<Record<string, File>>({});
+  const [documentNames, setDocumentNames] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitTooltip, setShowSubmitTooltip] = useState(false);
   const [formKey, setFormKey] = useState(0);
-  const [documentFiles, setDocumentFiles] = useState<
-    Partial<Record<keyof ComplianceDocuments, File>>
-  >({});
   const { preview, close, openFromFile } = usePdfPreview();
 
   useEffect(() => {
-    if (!requestId) return;
-    const saved = getComplianceSubmissionById(requestId);
-    if (saved) setValues(normalizeComplianceSubmission(saved));
-  }, [requestId]);
+    if (!requestId) {
+      setLoading(false);
+      setProduct(null);
+      return;
+    }
 
-  if (!ready) {
+    let active = true;
+    setLoading(true);
+    setLoadError(null);
+
+    getProductDetail(requestId)
+      .then((detail) => {
+        if (!active) return;
+        setProduct(detail);
+        const initialText: Record<string, string> = {};
+        for (const field of detail.fieldRequirements) {
+          initialText[field.id] = field.fieldValue?.value ?? "";
+        }
+        setTextValues(initialText);
+        const initialNames: Record<string, string> = {};
+        for (const doc of detail.documentRequirements) {
+          if (doc.document?.fileName) {
+            initialNames[doc.id] = doc.document.fileName;
+          }
+        }
+        setDocumentNames(initialNames);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setLoadError(err instanceof Error ? err.message : "Failed to load product");
+        setProduct(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [requestId, getProductDetail]);
+
+  if (loading) {
     return (
       <div className="flex min-h-full flex-1 items-center justify-center bg-bg-app text-[13px] text-text-muted">
         Loading…
@@ -158,11 +186,11 @@ export default function ProductCompliancePage() {
     );
   }
 
-  if (!request) {
+  if (loadError || !product) {
     return (
       <div className="flex min-h-full flex-1 flex-col items-center justify-center bg-bg-app px-4 text-center">
         <p className="text-[15px] font-medium text-text-primary">
-          Product request not found
+          {loadError ?? "Product request not found"}
         </p>
         <Link
           href="/dashboard?section=products"
@@ -174,50 +202,47 @@ export default function ProductCompliancePage() {
     );
   }
 
-  function updateDocument(
-    key: keyof ComplianceDocuments,
-    patch: Partial<ComplianceDocumentField>,
-  ) {
-    setValues((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], ...patch },
-    }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
+  const request = apiDetailToProductRequest(product);
+  const canEdit = product.status === "PENDING";
+
+  if (!canEdit) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col items-center justify-center bg-bg-app px-4 text-center">
+        <p className="text-[15px] font-medium text-text-primary">
+          This request has already been submitted
+        </p>
+        <Link
+          href="/dashboard?section=products"
+          className="mt-4 text-[13px] font-medium text-brand-600 hover:text-brand-700"
+        >
+          Back to product requests
+        </Link>
+      </div>
+    );
   }
 
-  function updateText(
-    key: keyof ComplianceTextFields,
-    patch: Partial<ComplianceTextField>,
-  ) {
-    setValues((prev) => ({
-      ...prev,
-      [key]: { ...prev[key], ...patch },
-    }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
+  function docLabel(doc: ApiDocumentRequirement) {
+    return doc.label || doc.type;
+  }
+
+  function fieldLabel(field: ApiFieldRequirement) {
+    return field.label || field.fieldType;
   }
 
   function validate(): Record<string, string> {
     const next: Record<string, string> = {};
 
-    for (const { key, label } of DOCUMENT_FIELD_CONFIG) {
-      const field = values[key];
-      if (field.required && !field.fileName.trim()) {
-        next[key] = `${label} is required`;
+    for (const doc of product!.documentRequirements) {
+      const hasFile = Boolean(documentFiles[doc.id] || documentNames[doc.id]);
+      if (doc.level === "REQUIRED" && !hasFile) {
+        next[doc.id] = `${docLabel(doc)} is required`;
       }
     }
 
-    for (const { key, label } of TEXT_FIELD_CONFIG) {
-      const field = values[key];
-      if (field.required && isEmptyHtml(field.value)) {
-        next[key] = `${label} is required`;
+    for (const field of product!.fieldRequirements) {
+      const value = textValues[field.id] ?? "";
+      if (field.level === "REQUIRED" && isEmptyHtml(value)) {
+        next[field.id] = `${fieldLabel(field)} is required`;
       }
     }
 
@@ -225,8 +250,13 @@ export default function ProductCompliancePage() {
   }
 
   function resetForm() {
-    setValues(emptyComplianceSubmission());
+    const initialText: Record<string, string> = {};
+    for (const field of product!.fieldRequirements) {
+      initialText[field.id] = "";
+    }
+    setTextValues(initialText);
     setDocumentFiles({});
+    setDocumentNames({});
     setErrors({});
     setFormKey((key) => key + 1);
   }
@@ -239,9 +269,19 @@ export default function ProductCompliancePage() {
 
     setSubmitting(true);
     try {
-      await submitCompliance(requestId, values, documentFiles);
+      const fieldValues = product!.fieldRequirements.map((field) => ({
+        requirementId: field.id,
+        value: textValues[field.id] ?? "",
+      }));
+      const files = Object.entries(documentFiles).map(([requirementId, file]) => ({
+        requirementId,
+        file,
+      }));
+
+      await submitCompliance(requestId, fieldValues, files);
       resetForm();
       setShowSubmitTooltip(true);
+      router.push("/dashboard?section=products");
     } finally {
       setSubmitting(false);
     }
@@ -251,7 +291,7 @@ export default function ProductCompliancePage() {
     <div className="min-h-full flex-1 bg-bg-app px-4 py-8 sm:px-6 lg:px-8">
       {showSubmitTooltip ? (
         <SubmitSuccessTooltip
-          requestId={requestId}
+          publicSlug={product.publicSlug}
           onClose={() => setShowSubmitTooltip(false)}
         />
       ) : null}
@@ -291,67 +331,68 @@ export default function ProductCompliancePage() {
         <form key={formKey} className="mt-8" noValidate onSubmit={handleSubmit}>
           <div className="grid gap-8 lg:grid-cols-2">
             <section>
-              <h2 className="text-[15px] font-medium text-text-primary">
-                Documents
-              </h2>
+              <h2 className="text-[15px] font-medium text-text-primary">Documents</h2>
               <div className="mt-4 space-y-4">
-                {DOCUMENT_FIELD_CONFIG.map(({ key, label, accept }) => {
-                  const field = values[key];
-                  const invalid = errors[key];
-                  const selectedFile = documentFiles[key];
+                {product.documentRequirements.map((doc) => {
+                  const invalid = errors[doc.id];
+                  const selectedFile = documentFiles[doc.id];
+                  const fileName = documentNames[doc.id] ?? "";
+                  const accept = TYPE_TO_ACCEPT[doc.type] ?? ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+
                   return (
                     <div
-                      key={key}
+                      key={doc.id}
                       className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <label
-                          htmlFor={`file-${key}`}
+                          htmlFor={`file-${doc.id}`}
                           className="text-[13px] font-medium text-text-primary"
                         >
-                          {label}
+                          {docLabel(doc)}
                         </label>
-                        <FieldCheckboxes
-                          required={field.required}
-                          isPublic={field.isPublic}
-                          onRequiredChange={(checked) =>
-                            updateDocument(key, { required: checked })
-                          }
-                          onPublicChange={(checked) =>
-                            updateDocument(key, { isPublic: checked })
-                          }
-                        />
+                        <RequirementMeta level={doc.level} visibility={doc.visibility} />
                       </div>
                       <input
-                        id={`file-${key}`}
+                        id={`file-${doc.id}`}
                         type="file"
                         accept={accept}
                         onChange={(event) => {
                           const file = event.target.files?.[0];
                           if (file) {
-                            setDocumentFiles((prev) => ({ ...prev, [key]: file }));
-                            updateDocument(key, { fileName: file.name });
+                            setDocumentFiles((prev) => ({ ...prev, [doc.id]: file }));
+                            setDocumentNames((prev) => ({ ...prev, [doc.id]: file.name }));
                           } else {
                             setDocumentFiles((prev) => {
                               const next = { ...prev };
-                              delete next[key];
+                              delete next[doc.id];
                               return next;
                             });
-                            updateDocument(key, { fileName: "" });
+                            setDocumentNames((prev) => {
+                              const next = { ...prev };
+                              delete next[doc.id];
+                              return next;
+                            });
                           }
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next[doc.id];
+                            return next;
+                          });
                         }}
                         className="mt-2 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
                       />
-                      <DocumentPreviewButton
-                        fileName={field.fileName}
-                        selectedFile={selectedFile}
-                        onPreview={() => openFromFile(label, selectedFile!)}
-                      />
+                      {fileName ? (
+                        <DocumentPreviewButton
+                          fileName={fileName}
+                          selectedFile={selectedFile}
+                          onPreview={() => {
+                            if (selectedFile) openFromFile(docLabel(doc), selectedFile);
+                          }}
+                        />
+                      ) : null}
                       {invalid ? (
-                        <p
-                          role="alert"
-                          className="mt-2 text-[12px] text-danger-500"
-                        >
+                        <p role="alert" className="mt-2 text-[12px] text-danger-500">
                           {invalid}
                         </p>
                       ) : null}
@@ -366,45 +407,39 @@ export default function ProductCompliancePage() {
                 Product information
               </h2>
               <div className="mt-4 space-y-4">
-                {TEXT_FIELD_CONFIG.map(({ key, label }) => {
-                  const field = values[key];
-                  const invalid = errors[key];
+                {product.fieldRequirements.map((field) => {
+                  const invalid = errors[field.id];
                   return (
                     <div
-                      key={key}
+                      key={field.id}
                       className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <label
-                          htmlFor={key}
+                          htmlFor={field.id}
                           className="text-[13px] font-medium text-text-primary"
                         >
-                          {label}
+                          {fieldLabel(field)}
                         </label>
-                        <FieldCheckboxes
-                          required={field.required}
-                          isPublic={field.isPublic}
-                          onRequiredChange={(checked) =>
-                            updateText(key, { required: checked })
-                          }
-                          onPublicChange={(checked) =>
-                            updateText(key, { isPublic: checked })
-                          }
-                        />
+                        <RequirementMeta level={field.level} visibility={field.visibility} />
                       </div>
                       <TiptapEditor
-                        key={`${key}-${formKey}`}
-                        id={key}
-                        value={field.value}
+                        key={`${field.id}-${formKey}`}
+                        id={field.id}
+                        value={textValues[field.id] ?? ""}
                         invalid={Boolean(invalid)}
-                        placeholder={`Enter ${label.toLowerCase()}`}
-                        onChange={(html) => updateText(key, { value: html })}
+                        placeholder={`Enter ${fieldLabel(field).toLowerCase()}`}
+                        onChange={(html) => {
+                          setTextValues((prev) => ({ ...prev, [field.id]: html }));
+                          setErrors((prev) => {
+                            const next = { ...prev };
+                            delete next[field.id];
+                            return next;
+                          });
+                        }}
                       />
                       {invalid ? (
-                        <p
-                          role="alert"
-                          className="mt-1.5 text-[12px] text-danger-500"
-                        >
+                        <p role="alert" className="mt-1.5 text-[12px] text-danger-500">
                           {invalid}
                         </p>
                       ) : null}

@@ -26,6 +26,10 @@ import {
 } from "./types";
 import { useAdminEntities } from "./useAdminEntities";
 import { useNotifications } from "@/lib/useNotifications";
+import { useProductRequests } from "../distributor/useProductRequests";
+import type { ProductRequest } from "../distributor/types";
+import { statusLabel } from "../distributor/types";
+import Image from "next/image";
 
 type ModalState =
   | { open: false }
@@ -135,6 +139,9 @@ function AdminDashboardInner() {
   const { user } = useAuth();
   const {
     ready,
+    loading: usersLoading,
+    error: usersError,
+    refetch: refetchUsers,
     entities,
     distributors,
     suppliers,
@@ -143,6 +150,13 @@ function AdminDashboardInner() {
     updateEntity,
     deleteEntity,
   } = useAdminEntities();
+
+  const {
+    ready: productsReady,
+    requests: productRequests,
+    error: productsError,
+    refetch: refetchProducts,
+  } = useProductRequests();
 
   const {
     ready: notificationsReady,
@@ -186,22 +200,30 @@ function AdminDashboardInner() {
     setModal({ open: true, mode: "edit", entityType: entity.type, entity });
   }
 
-  function handleSubmit(values: EntityFormValues, entityType: EntityType) {
+  async function handleSubmit(values: EntityFormValues, entityType: EntityType) {
     if (!modal.open) return;
-    if (modal.mode === "create") {
-      addEntity(entityType, values);
-      return;
+    try {
+      if (modal.mode === "create") {
+        await addEntity(entityType, values);
+        setModal({ open: false });
+        return;
+      }
+      await updateEntity(
+        modal.entity.id,
+        {
+          ...values,
+          password: values.password.trim() || modal.entity.password,
+        },
+        entityType,
+      );
+      setModal({ open: false });
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Failed to save user");
     }
-    const password =
-      values.password.trim() || modal.entity.password;
-    updateEntity(modal.entity.id, { ...values, password }, entityType);
   }
 
-  function handleDelete(entity: AdminEntity) {
-    const label = roleLabel(entity.type).toLowerCase();
-    if (window.confirm(`Delete ${entity.name} (${label})?`)) {
-      deleteEntity(entity.id);
-    }
+  function handleDelete(_entity: AdminEntity) {
+    window.alert("User delete is not available yet");
   }
 
   return (
@@ -219,6 +241,7 @@ function AdminDashboardInner() {
       ) : section === "dashboard" ? (
         <DashboardSection
           recentUsers={recentUsers}
+          recentRequests={productRequests.slice(0, 5)}
           onCreateDistributor={() => openCreate("distributor")}
           onViewUsers={() => navigate("users")}
         />
@@ -227,12 +250,20 @@ function AdminDashboardInner() {
           entities={entities}
           distributorCount={distributors.length}
           supplierCount={suppliers.length}
+          loading={usersLoading}
+          error={usersError}
+          onRetry={refetchUsers}
           onCreate={() => openCreate("distributor")}
           onEdit={openEdit}
           onDelete={handleDelete}
         />
       ) : section === "products" ? (
-        <ProductsPlaceholder />
+        <AdminProductsSection
+          requests={productRequests}
+          loading={!productsReady}
+          error={productsError}
+          onRetry={refetchProducts}
+        />
       ) : section === "notifications" ? (
         <NotificationsInbox
           notifications={notifications}
@@ -264,10 +295,12 @@ function AdminDashboardInner() {
 
 function DashboardSection({
   recentUsers,
+  recentRequests,
   onCreateDistributor,
   onViewUsers,
 }: {
   recentUsers: AdminEntity[];
+  recentRequests: ProductRequest[];
   onCreateDistributor: () => void;
   onViewUsers: () => void;
 }) {
@@ -370,10 +403,41 @@ function DashboardSection({
               Recent requests
             </h2>
           </div>
-          <EmptyState
-            title="No product requests yet"
-            description="Requests created by distributors will show up here."
-          />
+          {recentRequests.length === 0 ? (
+            <EmptyState
+              title="No product requests yet"
+              description="Requests created by distributors will show up here."
+            />
+          ) : (
+            <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
+              <table className="min-w-full text-left text-[13px]">
+                <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium">Product</th>
+                    <th className="px-4 py-2.5 font-medium">Supplier</th>
+                    <th className="px-4 py-2.5 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {recentRequests.map((request) => (
+                    <tr key={request.id} className="h-11">
+                      <td className="px-4 py-2 font-medium text-text-primary">
+                        {request.productName}
+                      </td>
+                      <td className="px-4 py-2 text-text-secondary">
+                        {request.supplierName}
+                      </td>
+                      <td className="px-4 py-2 text-text-muted">
+                        {request.apiStatus === "SUBMITTED"
+                          ? "Submitted"
+                          : statusLabel(request.status)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       </div>
     </div>
@@ -384,6 +448,9 @@ function UsersSection({
   entities,
   distributorCount,
   supplierCount,
+  loading,
+  error,
+  onRetry,
   onCreate,
   onEdit,
   onDelete,
@@ -391,6 +458,9 @@ function UsersSection({
   entities: AdminEntity[];
   distributorCount: number;
   supplierCount: number;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onCreate: () => void;
   onEdit: (entity: AdminEntity) => void;
   onDelete: (entity: AdminEntity) => void;
@@ -470,7 +540,22 @@ function UsersSection({
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {error ? (
+        <div className="mb-4 flex items-center justify-between rounded-[9px] border border-danger-50 bg-danger-50/40 px-4 py-3">
+          <p className="text-[13px] text-danger-500">{error}</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {loading ? <SkeletonRows /> : null}
+
+      {!loading && filtered.length === 0 ? (
         <EmptyState
           title={entities.length === 0 ? "No users yet" : "No matching users"}
           description={
@@ -490,7 +575,7 @@ function UsersSection({
             ) : undefined
           }
         />
-      ) : (
+      ) : !loading ? (
         <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
           <table className="min-w-full text-left text-[13px]">
             <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
@@ -524,14 +609,18 @@ function UsersSection({
                       <button
                         type="button"
                         onClick={() => onEdit(entity)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                        disabled
+                        title="User edit is not available yet"
+                        className="cursor-not-allowed rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-text-muted opacity-60"
                       >
                         Edit
                       </button>
                       <button
                         type="button"
                         onClick={() => onDelete(entity)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                        disabled
+                        title="User delete is not available yet"
+                        className="cursor-not-allowed rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-text-muted opacity-60"
                       >
                         Delete
                       </button>
@@ -542,22 +631,134 @@ function UsersSection({
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
-function ProductsPlaceholder() {
+function AdminProductsSection({
+  requests,
+  loading,
+  error,
+  onRetry,
+}: {
+  requests: ProductRequest[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  const [search, setSearch] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return requests;
+    return requests.filter(
+      (request) =>
+        request.productName.toLowerCase().includes(q) ||
+        request.supplierName.toLowerCase().includes(q) ||
+        request.distributorName.toLowerCase().includes(q),
+    );
+  }, [requests, search]);
+
   return (
     <div>
       <PageHeader
         title="Product requests"
-        description="Browse and filter compliance requests across distributors"
+        description="Browse compliance requests across distributors"
       />
-      <EmptyState
-        title="No product requests yet"
-        description="When distributors create requests, they will appear in this list."
-      />
+
+      {error ? (
+        <div className="mb-4 flex items-center justify-between rounded-[9px] border border-danger-50 bg-danger-50/40 px-4 py-3">
+          <p className="text-[13px] text-danger-500">{error}</p>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      <div className="mb-4">
+        <label className="sr-only" htmlFor="admin-product-search">
+          Search product requests
+        </label>
+        <input
+          id="admin-product-search"
+          type="search"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search product, supplier, or distributor"
+          className="h-10 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25 sm:max-w-xs"
+        />
+      </div>
+
+      {loading ? (
+        <SkeletonRows />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title={requests.length === 0 ? "No product requests yet" : "No matching requests"}
+          description={
+            requests.length === 0
+              ? "When distributors create requests, they will appear in this list."
+              : "Try a different search."
+          }
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
+          <table className="min-w-full text-left text-[13px]">
+            <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
+              <tr>
+                <th className="px-4 py-2.5 font-medium">Product</th>
+                <th className="px-4 py-2.5 font-medium">Distributor</th>
+                <th className="px-4 py-2.5 font-medium">Supplier</th>
+                <th className="px-4 py-2.5 font-medium">Progress</th>
+                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5 font-medium">Created</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {filtered.map((request) => (
+                <tr key={request.id} className="h-14">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-3">
+                      <Image
+                        src={request.productImage}
+                        alt=""
+                        width={32}
+                        height={32}
+                        unoptimized
+                        className="size-8 shrink-0 rounded-[6px] object-cover outline outline-border-subtle"
+                      />
+                      <span className="font-medium text-text-primary">
+                        {request.productName}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-text-secondary">
+                    {request.distributorName}
+                  </td>
+                  <td className="px-4 py-2 text-text-secondary">
+                    {request.supplierName}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
+                    {request.progress}%
+                  </td>
+                  <td className="px-4 py-2 text-text-muted">
+                    {request.apiStatus === "SUBMITTED"
+                      ? "Submitted"
+                      : statusLabel(request.status)}
+                  </td>
+                  <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
+                    {formatDate(request.requestedAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

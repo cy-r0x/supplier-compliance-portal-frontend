@@ -6,9 +6,9 @@ import {
   PublicProductSkeleton,
   PublicProductView,
 } from "@/components/public/PublicProductView";
-import { clearLegacyComplianceFileStorage } from "@/lib/compliance-files";
+import { getPublicProduct } from "@/lib/api/public-product-api";
 import {
-  getPublicProductFromStorage,
+  mapApiPublicProduct,
   revokePublicProductUrls,
   type PublicProduct,
 } from "@/lib/public-product";
@@ -31,29 +31,31 @@ function PublicProductNotFound() {
 
 export default function PublicProductPage() {
   const params = useParams();
-  const id = typeof params.id === "string" ? params.id : "";
+  const publicSlug = typeof params.id === "string" ? params.id : "";
   const [product, setProduct] = useState<PublicProduct | null | undefined>(
     undefined,
   );
 
   useEffect(() => {
-    clearLegacyComplianceFileStorage();
-
-    if (!id) {
+    if (!publicSlug) {
       setProduct(null);
       return;
     }
 
     let active = true;
 
-    getPublicProductFromStorage(id).then((next) => {
-      if (active) setProduct(next);
-    });
+    getPublicProduct(publicSlug)
+      .then((data) => {
+        if (active) setProduct(mapApiPublicProduct(publicSlug, data));
+      })
+      .catch(() => {
+        if (active) setProduct(null);
+      });
 
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [publicSlug]);
 
   useEffect(() => {
     return () => {

@@ -200,7 +200,7 @@ function SupplierDashboardInner() {
   );
 
   const pendingCount = useMemo(
-    () => requests.filter((request) => request.status === "pending").length,
+    () => requests.filter((request) => request.apiStatus === "PENDING").length,
     [requests],
   );
   const approvedCount = useMemo(
@@ -401,11 +401,7 @@ function ProductRequestsSection({
                         {formatDate(request.requestedAt)}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {request.submitted ? (
-                          <span className="text-[12px] font-medium text-brand-700">
-                            Submitted
-                          </span>
-                        ) : (
+                        {request.apiStatus === "PENDING" ? (
                           <button
                             type="button"
                             onClick={() => onEdit(request)}
@@ -413,6 +409,14 @@ function ProductRequestsSection({
                           >
                             Edit
                           </button>
+                        ) : (
+                          <span className="text-[12px] font-medium text-text-muted">
+                            {request.apiStatus === "SUBMITTED"
+                              ? "Awaiting review"
+                              : request.status === "approved"
+                                ? "Approved"
+                                : "Submitted"}
+                          </span>
                         )}
                       </td>
                     </tr>

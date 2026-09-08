@@ -108,19 +108,28 @@ function SkeletonRows() {
   );
 }
 
-function StatusBadge({ status }: { status: ProductRequestStatus }) {
+function RequestStatusBadge({ request }: { request: ProductRequest }) {
+  const label =
+    request.apiStatus === "SUBMITTED"
+      ? "Submitted"
+      : request.apiStatus === "PENDING"
+        ? "Pending"
+        : statusLabel(request.status);
+
   const styles =
-    status === "approved"
+    request.apiStatus === "APPROVED" || request.status === "approved"
       ? "bg-brand-100 text-brand-700"
-      : status === "rejected"
+      : request.status === "rejected"
         ? "bg-danger-50 text-danger-500"
-        : "bg-bg-inset text-text-secondary";
+        : request.apiStatus === "SUBMITTED"
+          ? "bg-amber-50 text-amber-700"
+          : "bg-bg-inset text-text-secondary";
 
   return (
     <span
       className={`inline-flex rounded-[6px] px-2 py-0.5 text-[11px] font-medium ${styles}`}
     >
-      {statusLabel(status)}
+      {label}
     </span>
   );
 }
@@ -202,8 +211,7 @@ function DistributorDashboardInner() {
     suppliers,
     addEntity,
     updateEntity,
-    deleteEntity,
-  } = useAdminEntities();
+  } = useAdminEntities({ roleFilter: "SUPPLIER" });
 
   const {
     ready: requestsReady,
@@ -212,6 +220,8 @@ function DistributorDashboardInner() {
     updateRequest,
     deleteRequest,
     approveRequest,
+    rejectRequest,
+    refetch: refetchRequests,
   } = useProductRequests();
 
   const {
@@ -241,6 +251,11 @@ function DistributorDashboardInner() {
   const [requestModal, setRequestModal] = useState<RequestModalState>({
     open: false,
   });
+  const [rejectModal, setRejectModal] = useState<
+    { open: false } | { open: true; request: ProductRequest }
+  >({ open: false });
+  const [rejectReason, setRejectReason] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const navigate = useCallback(
     (id: string) => {
@@ -265,21 +280,31 @@ function DistributorDashboardInner() {
     setSupplierModal({ open: true, mode: "edit", entity });
   }
 
-  function handleSupplierSubmit(values: EntityFormValues) {
+  async function handleSupplierSubmit(values: EntityFormValues) {
     if (!supplierModal.open) return;
-    if (supplierModal.mode === "create") {
-      addEntity("supplier", values);
-      return;
+    setActionError(null);
+    try {
+      if (supplierModal.mode === "create") {
+        await addEntity("supplier", values);
+        setSupplierModal({ open: false });
+        return;
+      }
+      await updateEntity(
+        supplierModal.entity.id,
+        {
+          ...values,
+          password: values.password.trim() || supplierModal.entity.password,
+        },
+        "supplier",
+      );
+      setSupplierModal({ open: false });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to save supplier");
     }
-    const password =
-      values.password.trim() || supplierModal.entity.password;
-    updateEntity(supplierModal.entity.id, { ...values, password }, "supplier");
   }
 
-  function handleDeleteSupplier(entity: AdminEntity) {
-    if (window.confirm(`Delete supplier ${entity.name}?`)) {
-      deleteEntity(entity.id);
-    }
+  function handleDeleteSupplier(_entity: AdminEntity) {
+    setActionError("Supplier delete is not available yet");
   }
 
   function openCreateRequest() {
@@ -290,27 +315,54 @@ function DistributorDashboardInner() {
     setRequestModal({ open: true, mode: "edit", request });
   }
 
-  function handleRequestSubmit(
+  async function handleRequestSubmit(
     values: ProductRequestFormValues,
     supplierName: string,
   ) {
     if (!requestModal.open) return;
     if (requestModal.mode === "create") {
-      addRequest(values, supplierName, distributorName);
+      await addRequest(values, supplierName, distributorName);
+      void refetchNotifications();
       return;
     }
-    updateRequest(requestModal.request.id, values, supplierName);
+    await updateRequest(requestModal.request.id, values, supplierName);
   }
 
-  function handleDeleteRequest(request: ProductRequest) {
-    if (window.confirm(`Delete request for ${request.productName}?`)) {
-      deleteRequest(request.id);
+  async function handleDeleteRequest(request: ProductRequest) {
+    if (!window.confirm(`Delete request for ${request.productName}?`)) return;
+    setActionError(null);
+    try {
+      await deleteRequest(request.id);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete request");
     }
   }
 
-  function handleApproveRequest(request: ProductRequest) {
-    if (window.confirm(`Approve request for ${request.productName}?`)) {
-      approveRequest(request.id);
+  async function handleApproveRequest(request: ProductRequest) {
+    if (!window.confirm(`Approve request for ${request.productName}?`)) return;
+    setActionError(null);
+    try {
+      await approveRequest(request.id);
+      void refetchNotifications();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to approve request");
+    }
+  }
+
+  function openRejectRequest(request: ProductRequest) {
+    setRejectReason("");
+    setRejectModal({ open: true, request });
+  }
+
+  async function handleRejectConfirm() {
+    if (!rejectModal.open || !rejectReason.trim()) return;
+    setActionError(null);
+    try {
+      await rejectRequest(rejectModal.request.id, rejectReason.trim());
+      setRejectModal({ open: false });
+      void refetchNotifications();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to reject request");
     }
   }
 
@@ -344,10 +396,12 @@ function DistributorDashboardInner() {
           <ProductRequestsSection
             requests={requests}
             supplierCount={suppliers.length}
+            actionError={actionError}
             onCreate={openCreateRequest}
             onEdit={openEditRequest}
             onDelete={handleDeleteRequest}
             onApprove={handleApproveRequest}
+            onReject={openRejectRequest}
             onCreateSupplier={openCreateSupplier}
           />
         ) : (
@@ -392,6 +446,48 @@ function DistributorDashboardInner() {
         onClose={() => setRequestModal({ open: false })}
         onSubmit={handleRequestSubmit}
       />
+
+      {rejectModal.open ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setRejectModal({ open: false });
+          }}
+        >
+          <div className="w-full max-w-md rounded-[12px] border border-border-subtle bg-bg-elevated p-6 shadow-sm">
+            <h2 className="font-display text-[18px] font-semibold text-text-primary">
+              Reject request
+            </h2>
+            <p className="mt-1 text-[13px] text-text-secondary">
+              Provide a reason for rejecting {rejectModal.request.productName}.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(event) => setRejectReason(event.target.value)}
+              rows={4}
+              className="mt-4 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 py-2 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
+              placeholder="Rejection reason"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectModal({ open: false })}
+                className="h-10 rounded-[9px] px-4 text-[13px] font-medium text-text-primary hover:bg-bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!rejectReason.trim()}
+                onClick={() => void handleRejectConfirm()}
+                className="h-10 rounded-[9px] bg-danger-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-danger-600 disabled:opacity-60"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -537,22 +633,15 @@ function SuppliersSection({
                     {formatDate(supplier.createdAt)}
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <div className="flex justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEdit(supplier)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(supplier)}
-                        className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onEdit(supplier)}
+                      disabled
+                      title="Supplier edit is not available yet"
+                      className="cursor-not-allowed rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-text-muted opacity-60"
+                    >
+                      Edit
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -567,29 +656,42 @@ function SuppliersSection({
 function ProductRequestsSection({
   requests,
   supplierCount,
+  actionError,
   onCreate,
   onEdit,
   onDelete,
   onApprove,
+  onReject,
   onCreateSupplier,
 }: {
   requests: ProductRequest[];
   supplierCount: number;
+  actionError: string | null;
   onCreate: () => void;
   onEdit: (request: ProductRequest) => void;
   onDelete: (request: ProductRequest) => void;
   onApprove: (request: ProductRequest) => void;
+  onReject: (request: ProductRequest) => void;
   onCreateSupplier: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
-    "all" | ProductRequestStatus
+    "all" | ProductRequestStatus | "submitted"
   >("all");
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return requests.filter((request) => {
-      if (statusFilter !== "all" && request.status !== statusFilter) return false;
+      if (statusFilter === "submitted" && request.apiStatus !== "SUBMITTED") {
+        return false;
+      }
+      if (
+        statusFilter !== "all" &&
+        statusFilter !== "submitted" &&
+        request.status !== statusFilter
+      ) {
+        return false;
+      }
       if (!q) return true;
       return (
         request.productName.toLowerCase().includes(q) ||
@@ -614,6 +716,10 @@ function ProductRequestsSection({
           </button>
         }
       />
+
+      {actionError ? (
+        <p role="alert" className="mb-4 text-[13px] text-danger-500">{actionError}</p>
+      ) : null}
 
       {supplierCount === 0 ? (
         <EmptyState
@@ -666,6 +772,7 @@ function ProductRequestsSection({
                 [
                   ["all", "All"],
                   ["pending", "Pending"],
+                  ["submitted", "Submitted"],
                   ["approved", "Approved"],
                   ["rejected", "Rejected"],
                 ] as const
@@ -738,36 +845,51 @@ function ProductRequestsSection({
                         {formatDate(request.requestedAt)}
                       </td>
                       <td className="px-4 py-2">
-                        <StatusBadge status={request.status} />
+                        <RequestStatusBadge request={request} />
                       </td>
                       <td className="px-4 py-2 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="flex gap-1">
-                            {request.status !== "approved" ? (
-                              <button
-                                type="button"
-                                onClick={() => onApprove(request)}
-                                className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-700 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                              >
-                                Approve
-                              </button>
+                            {request.apiStatus === "SUBMITTED" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => onApprove(request)}
+                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-700 transition-colors duration-150 hover:bg-brand-100/60"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onReject(request)}
+                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50"
+                                >
+                                  Reject
+                                </button>
+                              </>
                             ) : null}
-                            <button
-                              type="button"
-                              onClick={() => onEdit(request)}
-                              className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onDelete(request)}
-                              className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                            >
-                              Delete
-                            </button>
+                            {request.apiStatus === "PENDING" ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => onEdit(request)}
+                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onDelete(request)}
+                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50"
+                                >
+                                  Delete
+                                </button>
+                              </>
+                            ) : null}
                           </div>
-                          <ProductQrCode request={request} />
+                          {request.apiStatus === "APPROVED" && request.publicSlug ? (
+                            <ProductQrCode request={request} />
+                          ) : null}
                         </div>
                       </td>
                     </tr>

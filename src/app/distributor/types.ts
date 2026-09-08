@@ -19,6 +19,12 @@ export function isDistributorSection(
 
 export type ProductRequestStatus = "pending" | "approved" | "rejected";
 
+export type ApiProductStatus =
+  | "PENDING"
+  | "SUBMITTED"
+  | "REJECTED"
+  | "APPROVED";
+
 export type ProductRequest = {
   id: string;
   productName: string;
@@ -31,12 +37,17 @@ export type ProductRequest = {
   status: ProductRequestStatus;
   submitted: boolean;
   submittedAt?: string;
+  publicSlug?: string;
+  rejectionReason?: string;
+  apiStatus?: ApiProductStatus;
 };
 
 export type ProductRequestFormValues = {
   productName: string;
   productImage: string;
-  progress: number;
+  sku?: string;
+  price?: number;
+  photoFile?: File | null;
   supplierId: string;
   status: ProductRequestStatus;
 };
