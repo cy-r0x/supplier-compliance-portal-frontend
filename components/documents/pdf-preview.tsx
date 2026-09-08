@@ -120,15 +120,20 @@ const previewButtonClass =
 export function DocumentPreviewButton({
   fileName,
   selectedFile,
+  previewUrl,
   onPreview,
 }: {
   fileName: string;
   selectedFile?: File;
+  /** Remote URL for distributor-prefilled documents (no local File yet) */
+  previewUrl?: string;
   onPreview: () => void;
 }) {
   if (!fileName) return null;
 
-  const canPreviewPdf = selectedFile && isPdfFile(selectedFile, fileName);
+  const canPreviewPdf =
+    (selectedFile && isPdfFile(selectedFile, fileName)) ||
+    Boolean(previewUrl && isPdfFileName(fileName));
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">

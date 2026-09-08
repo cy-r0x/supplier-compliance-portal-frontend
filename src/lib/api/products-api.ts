@@ -5,7 +5,12 @@ import type {
   ApiProductListItem,
   ApiProductStatus,
 } from "@/lib/products/map-product";
-import { buildCreateProductFormData, type CreateProductInput } from "@/lib/products/requirement-defaults";
+import {
+  buildCreateProductFormData,
+  buildUpdateProductFormData,
+  type CreateProductComplianceInput,
+  type UpdateProductComplianceInput,
+} from "@/lib/products/compliance-form";
 
 export type ListProductsParams = {
   page?: number;
@@ -49,11 +54,9 @@ export async function getProduct(id: string): Promise<ApiProductDetail> {
   return data.data;
 }
 
-export async function createProduct(input: CreateProductInput): Promise<void> {
+export async function createProduct(input: CreateProductComplianceInput): Promise<void> {
   const form = buildCreateProductFormData(input);
-  const { data } = await api.post<ApiResponse<null>>("/products", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await api.post<ApiResponse<null>>("/products", form);
 
   if (!data.success) {
     throw new ApiError(data.message);
@@ -77,9 +80,19 @@ export async function updateProduct(
   if (input.price !== undefined) form.append("price", String(input.price));
   if (input.photo) form.append("photo", input.photo);
 
-  const { data } = await api.patch<ApiResponse<null>>(`/products/${id}`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await api.patch<ApiResponse<null>>(`/products/${id}`, form);
+
+  if (!data.success) {
+    throw new ApiError(data.message);
+  }
+}
+
+export async function updateProductSetup(
+  id: string,
+  input: UpdateProductComplianceInput,
+): Promise<void> {
+  const form = buildUpdateProductFormData(input);
+  const { data } = await api.patch<ApiResponse<null>>(`/products/${id}`, form);
 
   if (!data.success) {
     throw new ApiError(data.message);
@@ -111,7 +124,6 @@ export async function submitProduct(
   const { data } = await api.post<ApiResponse<null>>(
     `/products/${id}/submit`,
     form,
-    { headers: { "Content-Type": "multipart/form-data" } },
   );
 
   if (!data.success) {

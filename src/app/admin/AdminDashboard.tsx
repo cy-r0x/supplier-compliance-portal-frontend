@@ -26,6 +26,7 @@ import {
 } from "./types";
 import { useAdminEntities } from "./useAdminEntities";
 import { useNotifications } from "@/lib/useNotifications";
+import UserSettingsPage from "@/components/settings/UserSettingsPage";
 import { useProductRequests } from "../distributor/useProductRequests";
 import type { ProductRequest } from "../distributor/types";
 import { statusLabel } from "../distributor/types";
@@ -278,7 +279,7 @@ function AdminDashboardInner() {
           onLoadMore={loadMoreNotifications}
         />
       ) : (
-        <SettingsSection user={user} />
+        <UserSettingsPage user={user} />
       )}
 
       <EntityFormModal
@@ -759,55 +760,6 @@ function AdminProductsSection({
           </table>
         </div>
       )}
-    </div>
-  );
-}
-
-function SettingsSection({ user }: { user: ReturnType<typeof useAuth>["user"] }) {
-  return (
-    <div>
-      <PageHeader
-        title="Settings"
-        description="Account preferences for this admin session"
-      />
-
-      <div className="space-y-6">
-        <section className="rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
-          <h2 className="text-[15px] font-medium text-text-primary">Account</h2>
-          <dl className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <dt className="text-[12px] text-text-muted">Name</dt>
-              <dd className="mt-1 text-[13px] text-text-primary">
-                {user?.name ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[12px] text-text-muted">Email</dt>
-              <dd className="mt-1 text-[13px] text-text-primary">
-                {user?.email ?? "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[12px] text-text-muted">Role</dt>
-              <dd className="mt-1 text-[13px] text-text-primary">
-                {user?.role ?? "—"}
-              </dd>
-            </div>
-          </dl>
-          <p className="mt-4 text-[12px] text-text-muted">
-            Password change will be available in a later release.
-          </p>
-        </section>
-
-        <section className="rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
-          <h2 className="text-[15px] font-medium text-text-primary">
-            Product request defaults
-          </h2>
-          <p className="mt-2 text-[13px] text-text-secondary">
-            Auto-approve applies to distributor accounts only.
-          </p>
-        </section>
-      </div>
     </div>
   );
 }

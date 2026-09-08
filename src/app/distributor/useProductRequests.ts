@@ -18,6 +18,10 @@ import {
   apiProductToProductRequest,
   mapUiStatusToApi,
 } from "@/lib/products/map-product";
+import {
+  createEmptyDocumentRows,
+  createEmptyTextRows,
+} from "@/lib/products/compliance-form";
 import type {
   ProductRequest,
   ProductRequestFormValues,
@@ -62,6 +66,8 @@ export function useProductRequests(initialParams?: ListProductsParams) {
         sku: values.sku?.trim(),
         price: values.price,
         photo: values.photoFile,
+        documents: createEmptyDocumentRows(),
+        textFields: createEmptyTextRows(),
       });
       await fetchRequests();
     },

@@ -59,9 +59,7 @@ export async function createUser(input: CreateUserInput): Promise<ApiUser> {
     form.append("photo", input.photo);
   }
 
-  const { data } = await api.post<ApiResponse<ApiUser>>("/users", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await api.post<ApiResponse<ApiUser>>("/users", form);
 
   if (!data.success) {
     throw new ApiError(data.message);

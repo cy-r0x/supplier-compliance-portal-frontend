@@ -1,12 +1,17 @@
 "use client";
 
 import { useId, useRef } from "react";
+import { HiOutlineArrowDownTray } from "react-icons/hi2";
 import { QRCodeCanvas } from "qrcode.react";
 import type { ProductRequest } from "./types";
 
 type ProductQrCodeProps = {
   request: ProductRequest;
 };
+
+const DISPLAY_SIZE = 40;
+const RENDER_SIZE = 160;
+const EXPORT_SIZE = 1024;
 
 function slugify(value: string) {
   return value
@@ -31,33 +36,50 @@ export default function ProductQrCode({ request }: ProductQrCodeProps) {
       (document.getElementById(canvasId) as HTMLCanvasElement | null);
     if (!canvas) return;
 
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = EXPORT_SIZE;
+    exportCanvas.height = EXPORT_SIZE;
+    const ctx = exportCanvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, EXPORT_SIZE, EXPORT_SIZE);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(canvas, 0, 0, EXPORT_SIZE, EXPORT_SIZE);
+
     const link = document.createElement("a");
-    link.href = canvas.toDataURL("image/png");
+    link.href = exportCanvas.toDataURL("image/png");
     link.download = `qr-${slugify(request.productName) || request.id}.png`;
     link.click();
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      <div className="rounded-[6px] border border-border-subtle bg-bg-elevated p-1">
-        <QRCodeCanvas
-          id={canvasId}
-          ref={canvasRef}
-          value={publicUrl}
-          size={40}
-          level="M"
-          marginSize={1}
-          title={`QR code for ${request.productName}`}
-        />
-      </div>
+    <div className="group relative shrink-0 rounded-[6px] border border-border-subtle bg-bg-elevated p-1">
+      <QRCodeCanvas
+        id={canvasId}
+        ref={canvasRef}
+        value={publicUrl}
+        size={RENDER_SIZE}
+        level="H"
+        marginSize={2}
+        title={`QR code for ${request.productName}`}
+        className="block size-10"
+        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}
+      />
       <button
         type="button"
-        onClick={handleDownload}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleDownload();
+        }}
         aria-label={`Download QR code for ${request.productName}`}
-        title="Download QR"
-        className="cursor-pointer rounded-[7px] px-2 py-1.5 text-[11px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+        title="Download QR code"
+        className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-[5px] bg-text-primary/55 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
       >
-        Download
+        <HiOutlineArrowDownTray
+          aria-hidden="true"
+          className="size-5 text-text-inverse drop-shadow-sm"
+        />
       </button>
     </div>
   );

@@ -2,13 +2,15 @@ export type DistributorSection =
   | "dashboard"
   | "suppliers"
   | "products"
-  | "notifications";
+  | "notifications"
+  | "settings";
 
 export const DISTRIBUTOR_SECTIONS: DistributorSection[] = [
   "dashboard",
   "suppliers",
   "products",
   "notifications",
+  "settings",
 ];
 
 export function isDistributorSection(

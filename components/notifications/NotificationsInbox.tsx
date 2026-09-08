@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import ProductThumbnail from "@/components/products/ProductThumbnail";
 import { formatDate } from "../../src/app/admin/types";
+import { useAuth } from "../../src/lib/auth/AuthProvider";
+import { getNotificationProductPath } from "../../src/lib/notifications/routing";
 import type { PortalNotification } from "../../src/lib/useNotifications";
 
 type NotificationsInboxProps = {
@@ -48,7 +51,7 @@ function SkeletonRows() {
       {[0, 1, 2].map((index) => (
         <div
           key={index}
-          className="h-16 animate-pulse rounded-[9px] bg-bg-muted"
+          className="h-20 animate-pulse rounded-[9px] bg-bg-muted"
         />
       ))}
     </div>
@@ -68,6 +71,7 @@ export default function NotificationsInbox({
   onLoadMore,
 }: NotificationsInboxProps) {
   const router = useRouter();
+  const { user } = useAuth();
 
   function handleClick(notification: PortalNotification) {
     if (!notification.read) {
@@ -75,7 +79,13 @@ export default function NotificationsInbox({
     }
 
     if (notification.productRequestId) {
-      router.push(`/products/${notification.productRequestId}`);
+      router.push(
+        getNotificationProductPath(
+          user?.role,
+          notification.productRequestId,
+          notification.type,
+        ),
+      );
     }
   }
 
@@ -131,27 +141,34 @@ export default function NotificationsInbox({
                 <button
                   type="button"
                   onClick={() => handleClick(notification)}
-                  className={`w-full px-4 py-4 text-left transition-colors duration-150 hover:bg-bg-muted ${
+                  className={`w-full px-4 py-3 text-left transition-colors duration-150 hover:bg-bg-muted ${
                     notification.read ? "" : "bg-brand-50/40"
                   }`}
                 >
-                  <div className="flex items-start gap-2">
-                    {!notification.read ? (
-                      <span
-                        className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-500"
-                        aria-label="Unread"
-                      />
-                    ) : (
-                      <span className="mt-1.5 size-2 shrink-0" aria-hidden="true" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-text-primary">
+                  <div className="flex min-h-[72px] items-center gap-4">
+                    {notification.productImage ? (
+                      <div className="relative shrink-0">
+                        <ProductThumbnail
+                          src={notification.productImage}
+                          size={72}
+                          fit="cover"
+                        />
+                        {!notification.read ? (
+                          <span
+                            className="absolute top-0 left-0 size-2.5 -translate-x-1/4 -translate-y-1/4 rounded-full border-2 border-bg-elevated bg-brand-500"
+                            aria-label="Unread"
+                          />
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+                      <p className="text-[13px] leading-snug font-medium text-text-primary">
                         {notification.title}
                       </p>
-                      <p className="mt-1 text-[13px] text-text-secondary">
+                      <p className="text-[13px] leading-snug text-text-secondary">
                         {notification.message}
                       </p>
-                      <p className="mt-1 text-[12px] text-text-muted">
+                      <p className="text-[12px] leading-snug text-text-muted">
                         {notification.productName
                           ? `${notification.productName} · `
                           : ""}

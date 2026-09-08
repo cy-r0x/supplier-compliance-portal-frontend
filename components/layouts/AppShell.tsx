@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { IconType } from "react-icons";
 import {
   HiOutlineBell,
@@ -12,6 +12,29 @@ import {
 import { useAuth } from "../../src/lib/auth/AuthProvider";
 
 const COLLAPSE_STORAGE_KEY = "scp-sidebar-collapsed";
+
+function formatNotificationCount(count: number): string {
+  if (count > 99) return "99+";
+  return String(count);
+}
+
+function NotificationCountBadge({
+  count,
+  className = "",
+}: {
+  count: number;
+  className?: string;
+}) {
+  if (count <= 0) return null;
+
+  return (
+    <span
+      className={`inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-brand-500 px-1 text-[10px] font-semibold leading-none text-text-inverse ${className}`}
+    >
+      {formatNotificationCount(count)}
+    </span>
+  );
+}
 
 export type AppShellNavItem = {
   id: string;
@@ -38,6 +61,8 @@ export default function AppShell({
   const { user, logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [collapseReady, setCollapseReady] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const userName = user?.name ?? "";
   const userRole = user?.role ?? "";
@@ -52,6 +77,30 @@ export default function AppShell({
     setCollapseReady(true);
   }, []);
 
+  useEffect(() => {
+    if (!profileOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setProfileOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [profileOpen]);
+
   function toggleCollapsed() {
     setCollapsed((prev) => {
       const next = !prev;
@@ -63,6 +112,12 @@ export default function AppShell({
       return next;
     });
   }
+
+  const resolvedNavItems = navItems.map((item) =>
+    item.id === "notifications" && notificationCount > 0
+      ? { ...item, badge: notificationCount }
+      : item,
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-bg-app text-text-primary">
@@ -110,15 +165,20 @@ export default function AppShell({
             >
               <HiOutlineBell aria-hidden="true" className="size-5" />
               {notificationCount > 0 ? (
-                <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-brand-500" />
+                <NotificationCountBadge
+                  count={notificationCount}
+                  className="absolute -top-0.5 -right-0.5"
+                />
               ) : null}
             </button>
 
-            <div className="group relative">
+            <div className="relative" ref={profileMenuRef}>
               <button
                 type="button"
                 aria-haspopup="menu"
+                aria-expanded={profileOpen}
                 aria-label="Open profile menu"
+                onClick={() => setProfileOpen((open) => !open)}
                 className="flex cursor-pointer items-center gap-2.5 rounded-[9px] py-1 pr-1 pl-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
                 <div className="hidden min-w-0 text-right sm:block">
@@ -140,12 +200,19 @@ export default function AppShell({
               <div
                 role="menu"
                 aria-label="Profile"
-                className="invisible absolute right-0 z-40 mt-2 w-44 origin-top-right rounded-[9px] border border-border-subtle bg-bg-elevated py-1 opacity-0 shadow-sm transition duration-150 group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100"
+                className={`absolute right-0 top-full z-40 mt-1 w-44 origin-top-right rounded-[9px] border border-border-subtle bg-bg-elevated py-1 shadow-sm transition duration-150 ${
+                  profileOpen
+                    ? "visible opacity-100"
+                    : "pointer-events-none invisible opacity-0"
+                }`}
               >
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => onNavigate("settings")}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onNavigate("settings");
+                  }}
                   className="block w-full cursor-pointer px-3.5 py-2 text-left text-[12px] text-text-primary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600"
                 >
                   Settings
@@ -154,7 +221,10 @@ export default function AppShell({
                 <button
                   type="button"
                   role="menuitem"
-                  onClick={() => logout()}
+                  onClick={() => {
+                    setProfileOpen(false);
+                    void logout();
+                  }}
                   className="block w-full cursor-pointer px-3.5 py-2 text-left text-[12px] text-text-primary transition-colors duration-150 hover:bg-bg-muted hover:text-brand-600"
                 >
                   Log out
@@ -204,7 +274,7 @@ export default function AppShell({
             className="flex flex-col gap-0.5 p-2"
             aria-label="Primary"
           >
-            {navItems.map((item) => {
+            {resolvedNavItems.map((item) => {
               const active = activeNavId === item.id;
               const Icon = item.icon;
               return (
@@ -241,12 +311,13 @@ export default function AppShell({
                     )}
                   </span>
                   {!collapsed && item.badge && item.badge > 0 ? (
-                    <span className="rounded-full bg-brand-500 px-1.5 py-0.5 text-[10px] font-medium text-text-inverse">
-                      {item.badge}
-                    </span>
+                    <NotificationCountBadge count={item.badge} />
                   ) : null}
                   {collapsed && item.badge && item.badge > 0 ? (
-                    <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-brand-500" />
+                    <NotificationCountBadge
+                      count={item.badge}
+                      className="absolute -top-0.5 -right-0.5"
+                    />
                   ) : null}
                 </button>
               );
@@ -259,7 +330,7 @@ export default function AppShell({
             className="flex gap-1 overflow-x-auto border-b border-border-subtle bg-bg-elevated px-3 py-2 md:hidden"
             aria-label="Primary mobile"
           >
-            {navItems.map((item) => {
+            {resolvedNavItems.map((item) => {
               const active = activeNavId === item.id;
               const Icon = item.icon;
               return (

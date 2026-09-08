@@ -18,7 +18,7 @@ export type ApiNotification = {
   isRead: boolean;
   productRequestId: string | null;
   createdAt: string;
-  productRequest: { id: string; name: string } | null;
+  productRequest: { id: string; name: string; photo: string | null } | null;
 };
 
 export type NotificationListData = {

@@ -27,9 +27,7 @@ export async function apiPatch<T>(url: string, body?: unknown): Promise<T> {
 }
 
 export async function apiPostForm<T>(url: string, formData: FormData): Promise<T> {
-  const { data } = await api.post<ApiResponse<T>>(url, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await api.post<ApiResponse<T>>(url, formData);
   return unwrap(data);
 }
 

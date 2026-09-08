@@ -13,16 +13,15 @@ import {
 import { useNotifications } from "../../lib/useNotifications";
 import AppShell from "../../../components/layouts/AppShell";
 import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
+import UserSettingsPage from "@/components/settings/UserSettingsPage";
 import EntityFormModal from "../admin/EntityFormModal";
 import type { AdminEntity, EntityFormValues } from "../admin/types";
 import { formatDate } from "../admin/types";
 import { useAdminEntities } from "../admin/useAdminEntities";
-import ProductRequestModal from "./ProductRequestModal";
 import ProductQrCode from "./ProductQrCode";
 import type {
   DistributorSection,
   ProductRequest,
-  ProductRequestFormValues,
   ProductRequestStatus,
 } from "./types";
 import { isDistributorSection, statusLabel } from "./types";
@@ -32,11 +31,6 @@ type SupplierModalState =
   | { open: false }
   | { open: true; mode: "create" }
   | { open: true; mode: "edit"; entity: AdminEntity };
-
-type RequestModalState =
-  | { open: false }
-  | { open: true; mode: "create" }
-  | { open: true; mode: "edit"; request: ProductRequest };
 
 const NAV_ITEMS = [
   { id: "dashboard" as const, label: "Dashboard", icon: HiOutlineHome },
@@ -216,11 +210,8 @@ function DistributorDashboardInner() {
   const {
     ready: requestsReady,
     requests,
-    addRequest,
-    updateRequest,
+    addRequest: _addRequest,
     deleteRequest,
-    approveRequest,
-    rejectRequest,
     refetch: refetchRequests,
   } = useProductRequests();
 
@@ -248,13 +239,6 @@ function DistributorDashboardInner() {
   const [supplierModal, setSupplierModal] = useState<SupplierModalState>({
     open: false,
   });
-  const [requestModal, setRequestModal] = useState<RequestModalState>({
-    open: false,
-  });
-  const [rejectModal, setRejectModal] = useState<
-    { open: false } | { open: true; request: ProductRequest }
-  >({ open: false });
-  const [rejectReason, setRejectReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const navigate = useCallback(
@@ -308,24 +292,15 @@ function DistributorDashboardInner() {
   }
 
   function openCreateRequest() {
-    setRequestModal({ open: true, mode: "create" });
+    router.push("/products/new");
+  }
+
+  function openViewSubmission(request: ProductRequest) {
+    router.push(`/products/${request.id}/review`);
   }
 
   function openEditRequest(request: ProductRequest) {
-    setRequestModal({ open: true, mode: "edit", request });
-  }
-
-  async function handleRequestSubmit(
-    values: ProductRequestFormValues,
-    supplierName: string,
-  ) {
-    if (!requestModal.open) return;
-    if (requestModal.mode === "create") {
-      await addRequest(values, supplierName, distributorName);
-      void refetchNotifications();
-      return;
-    }
-    await updateRequest(requestModal.request.id, values, supplierName);
+    router.push(`/products/${request.id}/edit`);
   }
 
   async function handleDeleteRequest(request: ProductRequest) {
@@ -335,34 +310,6 @@ function DistributorDashboardInner() {
       await deleteRequest(request.id);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Failed to delete request");
-    }
-  }
-
-  async function handleApproveRequest(request: ProductRequest) {
-    if (!window.confirm(`Approve request for ${request.productName}?`)) return;
-    setActionError(null);
-    try {
-      await approveRequest(request.id);
-      void refetchNotifications();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to approve request");
-    }
-  }
-
-  function openRejectRequest(request: ProductRequest) {
-    setRejectReason("");
-    setRejectModal({ open: true, request });
-  }
-
-  async function handleRejectConfirm() {
-    if (!rejectModal.open || !rejectReason.trim()) return;
-    setActionError(null);
-    try {
-      await rejectRequest(rejectModal.request.id, rejectReason.trim());
-      setRejectModal({ open: false });
-      void refetchNotifications();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to reject request");
     }
   }
 
@@ -400,11 +347,10 @@ function DistributorDashboardInner() {
             onCreate={openCreateRequest}
             onEdit={openEditRequest}
             onDelete={handleDeleteRequest}
-            onApprove={handleApproveRequest}
-            onReject={openRejectRequest}
+            onView={openViewSubmission}
             onCreateSupplier={openCreateSupplier}
           />
-        ) : (
+        ) : section === "notifications" ? (
           <NotificationsInbox
             notifications={notifications}
             unreadCount={unreadCount}
@@ -417,6 +363,8 @@ function DistributorDashboardInner() {
             loadingMore={loadingMoreNotifications}
             onLoadMore={loadMoreNotifications}
           />
+        ) : (
+          <UserSettingsPage user={user} />
         )}
       </AppShell>
 
@@ -433,61 +381,6 @@ function DistributorDashboardInner() {
         onClose={() => setSupplierModal({ open: false })}
         onSubmit={handleSupplierSubmit}
       />
-
-      <ProductRequestModal
-        open={requestModal.open}
-        mode={requestModal.open ? requestModal.mode : "create"}
-        suppliers={suppliers}
-        initial={
-          requestModal.open && requestModal.mode === "edit"
-            ? requestModal.request
-            : null
-        }
-        onClose={() => setRequestModal({ open: false })}
-        onSubmit={handleRequestSubmit}
-      />
-
-      {rejectModal.open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setRejectModal({ open: false });
-          }}
-        >
-          <div className="w-full max-w-md rounded-[12px] border border-border-subtle bg-bg-elevated p-6 shadow-sm">
-            <h2 className="font-display text-[18px] font-semibold text-text-primary">
-              Reject request
-            </h2>
-            <p className="mt-1 text-[13px] text-text-secondary">
-              Provide a reason for rejecting {rejectModal.request.productName}.
-            </p>
-            <textarea
-              value={rejectReason}
-              onChange={(event) => setRejectReason(event.target.value)}
-              rows={4}
-              className="mt-4 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 py-2 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
-              placeholder="Rejection reason"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRejectModal({ open: false })}
-                className="h-10 rounded-[9px] px-4 text-[13px] font-medium text-text-primary hover:bg-bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!rejectReason.trim()}
-                onClick={() => void handleRejectConfirm()}
-                className="h-10 rounded-[9px] bg-danger-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-danger-600 disabled:opacity-60"
-              >
-                Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -660,8 +553,7 @@ function ProductRequestsSection({
   onCreate,
   onEdit,
   onDelete,
-  onApprove,
-  onReject,
+  onView,
   onCreateSupplier,
 }: {
   requests: ProductRequest[];
@@ -670,8 +562,7 @@ function ProductRequestsSection({
   onCreate: () => void;
   onEdit: (request: ProductRequest) => void;
   onDelete: (request: ProductRequest) => void;
-  onApprove: (request: ProductRequest) => void;
-  onReject: (request: ProductRequest) => void;
+  onView: (request: ProductRequest) => void;
   onCreateSupplier: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -850,23 +741,14 @@ function ProductRequestsSection({
                       <td className="px-4 py-2 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <div className="flex gap-1">
-                            {request.apiStatus === "SUBMITTED" ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => onApprove(request)}
-                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-700 transition-colors duration-150 hover:bg-brand-100/60"
-                                >
-                                  Approve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onReject(request)}
-                                  className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 transition-colors duration-150 hover:bg-danger-50"
-                                >
-                                  Reject
-                                </button>
-                              </>
+                            {request.apiStatus !== "PENDING" ? (
+                              <button
+                                type="button"
+                                onClick={() => onView(request)}
+                                className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60"
+                              >
+                                View submission
+                              </button>
                             ) : null}
                             {request.apiStatus === "PENDING" ? (
                               <>

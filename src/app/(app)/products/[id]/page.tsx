@@ -36,24 +36,7 @@ const TYPE_TO_ACCEPT = Object.fromEntries(
   }),
 );
 
-function RequirementMeta({
-  level,
-  visibility,
-}: {
-  level: "REQUIRED" | "OPTIONAL";
-  visibility: "PUBLIC" | "PRIVATE";
-}) {
-  return (
-    <div className="flex shrink-0 flex-wrap gap-2">
-      <span className="rounded-[6px] bg-bg-inset px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-        {level === "REQUIRED" ? "Required" : "Optional"}
-      </span>
-      <span className="rounded-[6px] bg-bg-inset px-2 py-0.5 text-[10px] font-medium text-text-secondary">
-        {visibility === "PUBLIC" ? "Public" : "Private"}
-      </span>
-    </div>
-  );
-}
+import { RequirementMeta } from "@/components/products/RequirementMeta";
 
 function SubmitSuccessTooltip({
   publicSlug,
@@ -129,12 +112,14 @@ export default function ProductCompliancePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [textValues, setTextValues] = useState<Record<string, string>>({});
   const [documentFiles, setDocumentFiles] = useState<Record<string, File>>({});
-  const [documentNames, setDocumentNames] = useState<Record<string, string>>({});
+  const [prefilledDocs, setPrefilledDocs] = useState<
+    Record<string, { fileName: string; fileUrl: string }>
+  >({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitTooltip, setShowSubmitTooltip] = useState(false);
   const [formKey, setFormKey] = useState(0);
-  const { preview, close, openFromFile } = usePdfPreview();
+  const { preview, close, openFromFile, openFromUrl } = usePdfPreview();
 
   useEffect(() => {
     if (!requestId) {
@@ -156,13 +141,17 @@ export default function ProductCompliancePage() {
           initialText[field.id] = field.fieldValue?.value ?? "";
         }
         setTextValues(initialText);
-        const initialNames: Record<string, string> = {};
+        const initialPrefilled: Record<string, { fileName: string; fileUrl: string }> =
+          {};
         for (const doc of detail.documentRequirements) {
-          if (doc.document?.fileName) {
-            initialNames[doc.id] = doc.document.fileName;
+          if (doc.document?.fileName && doc.document?.fileUrl) {
+            initialPrefilled[doc.id] = {
+              fileName: doc.document.fileName,
+              fileUrl: doc.document.fileUrl,
+            };
           }
         }
-        setDocumentNames(initialNames);
+        setPrefilledDocs(initialPrefilled);
       })
       .catch((err) => {
         if (!active) return;
@@ -233,7 +222,7 @@ export default function ProductCompliancePage() {
     const next: Record<string, string> = {};
 
     for (const doc of product!.documentRequirements) {
-      const hasFile = Boolean(documentFiles[doc.id] || documentNames[doc.id]);
+      const hasFile = Boolean(documentFiles[doc.id] || prefilledDocs[doc.id]);
       if (doc.level === "REQUIRED" && !hasFile) {
         next[doc.id] = `${docLabel(doc)} is required`;
       }
@@ -256,7 +245,7 @@ export default function ProductCompliancePage() {
     }
     setTextValues(initialText);
     setDocumentFiles({});
-    setDocumentNames({});
+    setPrefilledDocs({});
     setErrors({});
     setFormKey((key) => key + 1);
   }
@@ -336,7 +325,9 @@ export default function ProductCompliancePage() {
                 {product.documentRequirements.map((doc) => {
                   const invalid = errors[doc.id];
                   const selectedFile = documentFiles[doc.id];
-                  const fileName = documentNames[doc.id] ?? "";
+                  const prefilled = prefilledDocs[doc.id];
+                  const fileName = selectedFile?.name ?? prefilled?.fileName ?? "";
+                  const previewUrl = selectedFile ? undefined : prefilled?.fileUrl;
                   const accept = TYPE_TO_ACCEPT[doc.type] ?? ".pdf,.doc,.docx,.png,.jpg,.jpeg";
 
                   return (
@@ -361,14 +352,8 @@ export default function ProductCompliancePage() {
                           const file = event.target.files?.[0];
                           if (file) {
                             setDocumentFiles((prev) => ({ ...prev, [doc.id]: file }));
-                            setDocumentNames((prev) => ({ ...prev, [doc.id]: file.name }));
                           } else {
                             setDocumentFiles((prev) => {
-                              const next = { ...prev };
-                              delete next[doc.id];
-                              return next;
-                            });
-                            setDocumentNames((prev) => {
                               const next = { ...prev };
                               delete next[doc.id];
                               return next;
@@ -386,8 +371,13 @@ export default function ProductCompliancePage() {
                         <DocumentPreviewButton
                           fileName={fileName}
                           selectedFile={selectedFile}
+                          previewUrl={previewUrl}
                           onPreview={() => {
-                            if (selectedFile) openFromFile(docLabel(doc), selectedFile);
+                            if (selectedFile) {
+                              openFromFile(docLabel(doc), selectedFile);
+                            } else if (previewUrl) {
+                              openFromUrl(docLabel(doc), fileName, previewUrl);
+                            }
                           }}
                         />
                       ) : null}

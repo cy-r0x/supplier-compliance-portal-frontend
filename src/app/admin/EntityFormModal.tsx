@@ -109,8 +109,8 @@ export default function EntityFormModal({
     else if (!EMAIL_PATTERN.test(email)) next.email = "Enter a valid email address";
     if (mode === "create" && !values.password.trim()) {
       next.password = "Temporary password is required";
-    } else if (values.password.trim() && values.password.trim().length < 6) {
-      next.password = "Password must be at least 6 characters";
+    } else if (values.password.trim() && values.password.trim().length < 8) {
+      next.password = "Password must be at least 8 characters";
     }
     return next;
   }

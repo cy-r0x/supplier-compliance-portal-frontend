@@ -10,6 +10,8 @@ import {
 } from "./api/notifications-api";
 import { useAuth } from "./auth/AuthProvider";
 
+import { FALLBACK_PRODUCT_IMAGE } from "@/components/products/ProductThumbnail";
+
 export type PortalNotification = {
   id: string;
   type: NotificationType;
@@ -17,6 +19,7 @@ export type PortalNotification = {
   message: string;
   productRequestId: string | null;
   productName: string | null;
+  productImage: string | null;
   createdAt: string;
   read: boolean;
 };
@@ -29,6 +32,9 @@ function toPortalNotification(notification: ApiNotification): PortalNotification
     message: notification.message,
     productRequestId: notification.productRequestId,
     productName: notification.productRequest?.name ?? null,
+    productImage: notification.productRequest
+      ? notification.productRequest.photo || FALLBACK_PRODUCT_IMAGE
+      : null,
     createdAt: notification.createdAt,
     read: notification.isRead,
   };

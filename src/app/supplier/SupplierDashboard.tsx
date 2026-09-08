@@ -11,17 +11,19 @@ import {
 } from "react-icons/hi2";
 import AppShell from "../../../components/layouts/AppShell";
 import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
+import UserSettingsPage from "@/components/settings/UserSettingsPage";
 import { formatDate } from "../admin/types";
 import type { ProductRequest } from "../distributor/types";
 import { useProductRequests } from "../distributor/useProductRequests";
 import { useNotifications } from "../../lib/useNotifications";
 
-type SupplierSection = "dashboard" | "products" | "notifications";
+type SupplierSection = "dashboard" | "products" | "notifications" | "settings";
 
 const SUPPLIER_SECTIONS: SupplierSection[] = [
   "dashboard",
   "products",
   "notifications",
+  "settings",
 ];
 
 function isSupplierSection(value: string): value is SupplierSection {
@@ -163,6 +165,7 @@ const DASHBOARD_PATH = "/dashboard";
 function SupplierDashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const { ready, requests } = useProductRequests();
 
   const {
@@ -241,7 +244,7 @@ function SupplierDashboardInner() {
             requests={requests}
             onEdit={handleEdit}
           />
-        ) : (
+        ) : section === "notifications" ? (
           <NotificationsInbox
             notifications={notifications}
             unreadCount={unreadCount}
@@ -254,6 +257,8 @@ function SupplierDashboardInner() {
             loadingMore={loadingMoreNotifications}
             onLoadMore={loadMoreNotifications}
           />
+        ) : (
+          <UserSettingsPage user={user} />
         )}
       </AppShell>
     </div>
