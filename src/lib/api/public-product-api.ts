@@ -17,14 +17,31 @@ export type PublicProductTextField = {
   value: string;
 };
 
+export type PublicProductStatus = "SUBMITTED" | "APPROVED" | "REJECTED";
+
 export type PublicProductData = {
   name: string;
-  photo: string | null;
+  status?: PublicProductStatus;
   supplierName: string;
-  approvedAt: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
   documents: PublicProductDocument[];
   textFields: PublicProductTextField[];
 };
+
+const PUBLIC_STATUSES = new Set<PublicProductStatus>([
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+]);
+
+export function isPublicProductStatus(
+  value: string | undefined | null,
+): value is PublicProductStatus {
+  return Boolean(value && PUBLIC_STATUSES.has(value as PublicProductStatus));
+}
 
 export async function getPublicProduct(
   publicSlug: string,
