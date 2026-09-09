@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { rewriteMediaUrlsDeep } from "../media-url";
 import { refreshAccessToken } from "../auth/token-refresh";
 import { getAccessToken } from "../auth/tokens";
 
@@ -17,6 +18,13 @@ export const api = axios.create({
 
 type RetryConfig = InternalAxiosRequestConfig & { _retry?: boolean };
 
+function proxyMediaInResponse<T extends { data?: unknown }>(response: T): T {
+  if (response.data !== undefined) {
+    response.data = rewriteMediaUrlsDeep(response.data);
+  }
+  return response;
+}
+
 api.interceptors.request.use((config) => {
   const token = getAccessToken();
   if (token) {
@@ -29,7 +37,7 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => proxyMediaInResponse(response),
   async (error: AxiosError) => {
     const original = error.config as RetryConfig | undefined;
     if (!original || original._retry) {
@@ -55,4 +63,8 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
   },
+);
+
+authAxios.interceptors.response.use((response) =>
+  proxyMediaInResponse(response),
 );

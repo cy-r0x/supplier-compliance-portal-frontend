@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toProxiedMediaUrl } from "@/lib/media-url";
 
 export const FALLBACK_PRODUCT_IMAGE = "/Images/avatar.jpg";
 
@@ -17,11 +18,12 @@ export default function ProductThumbnail({
   fit = "contain",
   className = "",
 }: ProductThumbnailProps) {
-  const initialSrc = src?.trim() || FALLBACK_PRODUCT_IMAGE;
+  const initialSrc =
+    toProxiedMediaUrl(src?.trim()) || FALLBACK_PRODUCT_IMAGE;
   const [imgSrc, setImgSrc] = useState(initialSrc);
 
   useEffect(() => {
-    setImgSrc(src?.trim() || FALLBACK_PRODUCT_IMAGE);
+    setImgSrc(toProxiedMediaUrl(src?.trim()) || FALLBACK_PRODUCT_IMAGE);
   }, [src]);
 
   return (

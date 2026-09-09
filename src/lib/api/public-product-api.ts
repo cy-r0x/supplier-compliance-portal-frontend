@@ -1,4 +1,5 @@
 import axios from "axios";
+import { rewriteMediaUrlsDeep } from "../media-url";
 import { API_BASE_URL } from "./axios";
 import { ApiError, type ApiResponse } from "./types";
 
@@ -54,5 +55,5 @@ export async function getPublicProduct(
     throw new ApiError(data.message);
   }
 
-  return data.data;
+  return rewriteMediaUrlsDeep(data.data);
 }

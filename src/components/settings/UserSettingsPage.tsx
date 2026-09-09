@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { getSettings, updateSettings } from "@/lib/api/settings-api";
 import { updateMyProfilePhoto } from "@/lib/api/users-api";
 import { useAuth } from "@/lib/auth/AuthProvider";
+import { toProxiedMediaUrl } from "@/lib/media-url";
 
 const FALLBACK_AVATAR = "/Images/avatar.jpg";
 
@@ -39,7 +40,7 @@ function ProfilePhotoField({
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const displaySrc = photo || FALLBACK_AVATAR;
+  const displaySrc = toProxiedMediaUrl(photo) || FALLBACK_AVATAR;
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

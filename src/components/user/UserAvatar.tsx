@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toProxiedMediaUrl } from "@/lib/media-url";
 
 export const FALLBACK_AVATAR = "/Images/avatar.jpg";
 
@@ -15,11 +16,11 @@ export default function UserAvatar({
   size = 32,
   className = "",
 }: UserAvatarProps) {
-  const initialSrc = src?.trim() || FALLBACK_AVATAR;
+  const initialSrc = toProxiedMediaUrl(src?.trim()) || FALLBACK_AVATAR;
   const [imgSrc, setImgSrc] = useState(initialSrc);
 
   useEffect(() => {
-    setImgSrc(src?.trim() || FALLBACK_AVATAR);
+    setImgSrc(toProxiedMediaUrl(src?.trim()) || FALLBACK_AVATAR);
   }, [src]);
 
   return (
