@@ -120,7 +120,27 @@ export default function ProductCompliancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitTooltip, setShowSubmitTooltip] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<
+    string | null
+  >(null);
   const { preview, close, openFromFile, openFromUrl } = usePdfPreview();
+
+  const productImageRequirementId = product?.documentRequirements.find(
+    (doc) => doc.type === "PRODUCT_IMAGE",
+  )?.id;
+  const selectedProductImageFile = productImageRequirementId
+    ? documentFiles[productImageRequirementId]
+    : undefined;
+
+  useEffect(() => {
+    if (!selectedProductImageFile) {
+      setProductImagePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(selectedProductImageFile);
+    setProductImagePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [selectedProductImageFile]);
 
   useEffect(() => {
     if (!requestId) {
@@ -190,6 +210,13 @@ export default function ProductCompliancePage() {
 
   const request = apiDetailToProductRequest(product);
   const canEdit = product.status === "PENDING";
+  const headerImageSrc =
+    productImagePreviewUrl ||
+    product.photo ||
+    (productImageRequirementId
+      ? prefilledDocs[productImageRequirementId]?.fileUrl
+      : undefined) ||
+    request.productImage;
 
   if (!canEdit) {
     return (
@@ -293,7 +320,7 @@ export default function ProductCompliancePage() {
         <header className="mt-6 rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
           <div className="flex items-start gap-4">
             <Image
-              src={request.productImage}
+              src={headerImageSrc}
               alt=""
               width={72}
               height={72}

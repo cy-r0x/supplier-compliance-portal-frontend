@@ -7,9 +7,11 @@ import { useEffect, useState } from "react";
 import {
   PdfPreviewModal,
   PublicDocumentPreviewButton,
+  isImageFileName,
   isPdfFileName,
   usePdfPreview,
 } from "../../../../../../components/documents/pdf-preview";
+import { toProxiedMediaUrl } from "@/lib/media-url";
 import { RequirementMeta } from "@/components/products/RequirementMeta";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import {
@@ -238,23 +240,40 @@ export default function ProductReviewPage() {
                       <RequirementMeta level={doc.level} visibility={doc.visibility} />
                     </div>
                     {fileUrl && fileName ? (
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <span className="text-[12px] text-text-muted">{fileName}</span>
-                        <a
-                          href={fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
-                        >
-                          Download
-                        </a>
-                        {isPdfFileName(fileName) ? (
-                          <PublicDocumentPreviewButton
-                            fileName={fileName}
-                            previewUrl={fileUrl}
-                            onPreview={() => openFromUrl(label, fileName, fileUrl)}
-                          />
+                      <div className="mt-3 space-y-3">
+                        {isImageFileName(fileName) ? (
+                          <button
+                            type="button"
+                            onClick={() => openFromUrl(label, fileName, fileUrl)}
+                            className="block overflow-hidden rounded-[10px] border border-border-subtle bg-bg-muted"
+                            aria-label={`Preview ${label}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={toProxiedMediaUrl(fileUrl) || fileUrl}
+                              alt=""
+                              className="h-36 w-full max-w-sm object-contain"
+                            />
+                          </button>
                         ) : null}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-[12px] text-text-muted">{fileName}</span>
+                          <a
+                            href={toProxiedMediaUrl(fileUrl) || fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
+                          >
+                            Download
+                          </a>
+                          {isPdfFileName(fileName) || isImageFileName(fileName) ? (
+                            <PublicDocumentPreviewButton
+                              fileName={fileName}
+                              previewUrl={fileUrl}
+                              onPreview={() => openFromUrl(label, fileName, fileUrl)}
+                            />
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
                       <p className="mt-2 text-[13px] text-text-muted italic">Not provided</p>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toProxiedMediaUrl } from "@/lib/media-url";
 
 export type PdfPreviewPayload = {
   label: string;
@@ -14,9 +15,22 @@ export function isPdfFileName(fileName: string) {
   return /\.pdf$/i.test(fileName);
 }
 
+export function isImageFileName(fileName: string) {
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(fileName);
+}
+
 export function isPdfFile(file: File, fileName?: string) {
   if (file.type === "application/pdf") return true;
   return isPdfFileName(fileName ?? file.name);
+}
+
+export function isImageFile(file: File, fileName?: string) {
+  if (file.type.startsWith("image/")) return true;
+  return isImageFileName(fileName ?? file.name);
+}
+
+export function isPreviewableFileName(fileName: string) {
+  return isPdfFileName(fileName) || isImageFileName(fileName);
 }
 
 export function PdfPreviewModal({
@@ -26,6 +40,10 @@ export function PdfPreviewModal({
   preview: PdfPreviewPayload;
   onClose: () => void;
 }) {
+  const isImage = isImageFileName(preview.fileName);
+  const src =
+    toProxiedMediaUrl(preview.url) || preview.url;
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
@@ -62,11 +80,22 @@ export function PdfPreviewModal({
             Close
           </button>
         </div>
-        <iframe
-          src={preview.url}
-          title={`PDF preview: ${preview.fileName}`}
-          className="min-h-0 flex-1 w-full bg-bg-muted"
-        />
+        {isImage ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center bg-bg-muted p-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt={preview.fileName}
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        ) : (
+          <iframe
+            src={src}
+            title={`PDF preview: ${preview.fileName}`}
+            className="min-h-0 flex-1 w-full bg-bg-muted"
+          />
+        )}
       </div>
     </div>
   );
@@ -117,6 +146,22 @@ export function usePdfPreview() {
 const previewButtonClass =
   "shrink-0 cursor-pointer rounded-[7px] border border-border-subtle bg-bg-elevated px-2.5 py-1 text-[11px] font-medium text-brand-600 transition-colors duration-150 hover:border-brand-100 hover:bg-brand-100/50 hover:text-brand-700";
 
+function useObjectUrl(file?: File) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setUrl(null);
+      return;
+    }
+    const next = URL.createObjectURL(file);
+    setUrl(next);
+    return () => URL.revokeObjectURL(next);
+  }, [file]);
+
+  return url;
+}
+
 export function DocumentPreviewButton({
   fileName,
   selectedFile,
@@ -129,22 +174,56 @@ export function DocumentPreviewButton({
   previewUrl?: string;
   onPreview: () => void;
 }) {
+  const objectUrl = useObjectUrl(
+    selectedFile && isImageFile(selectedFile, fileName) ? selectedFile : undefined,
+  );
+
+  const thumbSrc = useMemo(() => {
+    if (objectUrl) return objectUrl;
+    if (previewUrl && isImageFileName(fileName)) {
+      return toProxiedMediaUrl(previewUrl) || previewUrl;
+    }
+    return null;
+  }, [objectUrl, previewUrl, fileName]);
+
   if (!fileName) return null;
 
-  const canPreviewPdf =
-    (selectedFile && isPdfFile(selectedFile, fileName)) ||
-    Boolean(previewUrl && isPdfFileName(fileName));
+  const canPreview =
+    (selectedFile &&
+      (isPdfFile(selectedFile, fileName) || isImageFile(selectedFile, fileName))) ||
+    Boolean(previewUrl && isPreviewableFileName(fileName));
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2">
-      <p className="min-w-0 flex-1 truncate text-[11px] text-text-muted">{fileName}</p>
-      {canPreviewPdf ? (
-        <button type="button" onClick={onPreview} className={previewButtonClass}>
-          Preview
+    <div className="mt-2 space-y-2">
+      {thumbSrc ? (
+        <button
+          type="button"
+          onClick={onPreview}
+          className="block overflow-hidden rounded-[10px] border border-border-subtle bg-bg-muted"
+          aria-label={`Preview ${fileName}`}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={thumbSrc}
+            alt=""
+            className="h-28 w-full max-w-xs object-contain"
+          />
         </button>
-      ) : selectedFile ? (
-        <span className="text-[10px] text-text-muted">Preview available for PDF files only</span>
       ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="min-w-0 flex-1 truncate text-[11px] text-text-muted">
+          {fileName}
+        </p>
+        {canPreview ? (
+          <button type="button" onClick={onPreview} className={previewButtonClass}>
+            Preview
+          </button>
+        ) : selectedFile ? (
+          <span className="text-[10px] text-text-muted">
+            Preview available for PDF and image files
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -158,7 +237,7 @@ export function PublicDocumentPreviewButton({
   previewUrl?: string;
   onPreview: () => void;
 }) {
-  if (!isPdfFileName(fileName) || !previewUrl) return null;
+  if (!previewUrl || !isPreviewableFileName(fileName)) return null;
 
   return (
     <button type="button" onClick={onPreview} className={previewButtonClass}>

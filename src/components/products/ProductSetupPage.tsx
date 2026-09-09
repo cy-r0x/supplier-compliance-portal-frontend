@@ -542,6 +542,9 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
                         onChange={(e) => {
                           const file = e.target.files?.[0] ?? null;
                           updateDocument(row.key, { prefillFile: file });
+                          if (row.key === "productImage" && file) {
+                            setPhotoFile(file);
+                          }
                         }}
                         className="mt-3 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
                       />
