@@ -1,0 +1,244 @@
+@import "tailwindcss";
+
+:root {
+  /* Surfaces */
+  --bg-app: #f4f7f7;
+  --bg-elevated: #ffffff;
+  --bg-muted: #e8eeee;
+  --bg-inset: #dff0f1;
+
+  /* Ink */
+  --text-primary: #123a3c;
+  --text-secondary: #4a6365;
+  --text-muted: #7a8f90;
+  --text-inverse: #ffffff;
+
+  /* Brand / action */
+  --brand-500: #1595a0;
+  --brand-600: #117f89;
+  --brand-700: #0e6a72;
+  --brand-100: #d5eef0;
+
+  /* Borders */
+  --border-subtle: #d5e0e0;
+  --border-strong: #b7c8c9;
+  --focus-ring: #55aeb5;
+
+  /* Feedback */
+  --danger-500: #c23b2e;
+  --danger-50: #fce8e6;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(18, 58, 60, 0.06);
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 12px;
+}
+
+@theme inline {
+  --color-bg-app: var(--bg-app);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-muted: var(--bg-muted);
+  --color-bg-inset: var(--bg-inset);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-100: var(--brand-100);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-focus-ring: var(--focus-ring);
+  --color-danger-500: var(--danger-500);
+  --color-danger-50: var(--danger-50);
+  --font-sans: var(--font-source-sans-3), "Source Sans 3", system-ui, sans-serif;
+  --font-display: var(--font-ibm-plex-sans), "IBM Plex Sans", system-ui, sans-serif;
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --shadow-sm: var(--shadow-sm);
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.tiptap-editor .ProseMirror,
+.tiptap-editor-content {
+  outline: none;
+}
+
+.tiptap-editor .ProseMirror p,
+.tiptap-editor-content p {
+  margin: 0;
+}
+
+.tiptap-editor .ProseMirror p + p,
+.tiptap-editor-content p + p {
+  margin-top: 0.5rem;
+}
+
+.tiptap-editor .ProseMirror ul,
+.tiptap-editor-content ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.tiptap-editor .ProseMirror ol,
+.tiptap-editor-content ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.tiptap-editor .ProseMirror li,
+.tiptap-editor-content li {
+  display: list-item;
+}
+
+.tiptap-editor .ProseMirror li p,
+.tiptap-editor-content li p {
+  margin: 0;
+}
+
+.tiptap-editor .ProseMirror strong,
+.tiptap-editor-content strong {
+  font-weight: 600;
+}
+
+.tiptap-editor .ProseMirror em,
+.tiptap-editor-content em {
+  font-style: italic;
+}
+
+.tiptap-editor .ProseMirror h1,
+.tiptap-editor-content h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.tiptap-editor .ProseMirror h2,
+.tiptap-editor-content h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.625rem 0 0.25rem;
+}
+
+.tiptap-editor .ProseMirror h3,
+.tiptap-editor-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.tiptap-editor .ProseMirror h1:first-child,
+.tiptap-editor-content h1:first-child,
+.tiptap-editor .ProseMirror h2:first-child,
+.tiptap-editor-content h2:first-child,
+.tiptap-editor .ProseMirror h3:first-child,
+.tiptap-editor-content h3:first-child {
+  margin-top: 0;
+}
+
+.tiptap-editor .ProseMirror a,
+.tiptap-editor-content a {
+  color: var(--brand-600);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.tiptap-editor .ProseMirror:focus,
+.tiptap-editor-content:focus {
+  outline: none;
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before,
+.tiptap-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Read-only rich text on public product page */
+.public-rich-text p {
+  margin: 0;
+}
+
+.public-rich-text p + p {
+  margin-top: 0.5rem;
+}
+
+.public-rich-text ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.public-rich-text ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.public-rich-text li {
+  display: list-item;
+}
+
+.public-rich-text strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.public-rich-text em {
+  font-style: italic;
+}
+
+.public-rich-text a {
+  color: var(--brand-600);
+  text-decoration: underline;
+}
+
+.public-rich-text h1,
+.public-rich-text h2,
+.public-rich-text h3 {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0.75rem 0 0.25rem;
+}
+
+.public-rich-text h1 {
+  font-size: 1.125rem;
+}
+
+.public-rich-text h2 {
+  font-size: 1rem;
+}
+
+.public-rich-text h3 {
+  font-size: 0.9375rem;
+}
