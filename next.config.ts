@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3000";
 
 const nextConfig: NextConfig = {
+  // Allow LAN / phone access to Next.js HMR and other /_next dev assets.
+  // `*.*.*.*` matches any IPv4 hostname (e.g. 192.168.0.165).
+  allowedDevOrigins: ["*.*.*.*", "localhost", "127.0.0.1"],
   async rewrites() {
     return [
       {
@@ -22,6 +25,12 @@ const nextConfig: NextConfig = {
       {
         protocol: "http",
         hostname: "127.0.0.1",
+        port: "9000",
+        pathname: "/**",
+      },
+      {
+        protocol: "http",
+        hostname: "49.213.52.38",
         port: "9000",
         pathname: "/**",
       },
