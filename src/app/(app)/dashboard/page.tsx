@@ -2,6 +2,7 @@
 
 import { AdminDashboard } from "@/app/admin/AdminDashboard";
 import { DistributorDashboard } from "@/app/distributor/DistributorDashboard";
+import { NoOrgPage } from "@/app/organization/NoOrgPage";
 import { SupplierDashboard } from "@/app/supplier/SupplierDashboard";
 import { useAuth } from "@/lib/auth/AuthProvider";
 
@@ -13,8 +14,8 @@ export default function DashboardPage() {
   switch (user.role) {
     case "SUPER_ADMIN":
       return <AdminDashboard />;
-    case "DISTRIBUTOR":
-      return <DistributorDashboard />;
+    case "USER":
+      return user.organization ? <DistributorDashboard /> : <NoOrgPage />;
     case "SUPPLIER":
       return <SupplierDashboard />;
     default:

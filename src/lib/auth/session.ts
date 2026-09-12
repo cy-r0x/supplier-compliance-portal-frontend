@@ -1,4 +1,11 @@
-export type UserRole = "SUPER_ADMIN" | "DISTRIBUTOR" | "SUPPLIER";
+export type UserRole = "SUPER_ADMIN" | "USER" | "SUPPLIER";
+
+export type AuthOrganization = {
+  id: string;
+  name: string;
+  role: "MANAGER" | "MEMBER";
+  membershipId: string;
+};
 
 export type AuthUser = {
   id: string;
@@ -6,9 +13,10 @@ export type AuthUser = {
   email: string;
   role: UserRole;
   photo: string | null;
+  organization?: AuthOrganization | null;
 };
 
-const ROLES: UserRole[] = ["SUPER_ADMIN", "DISTRIBUTOR", "SUPPLIER"];
+const ROLES: UserRole[] = ["SUPER_ADMIN", "USER", "SUPPLIER"];
 
 function decodeBase64Url(value: string): string {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -43,6 +51,7 @@ export function decodeAccessToken(accessToken: string): AuthUser | null {
       email: payload.email,
       role: payload.role as UserRole,
       photo: payload.photo ?? null,
+      organization: null,
     };
   } catch {
     return null;

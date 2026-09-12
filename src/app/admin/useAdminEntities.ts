@@ -64,8 +64,8 @@ export function useAdminEntities(options?: UseAdminEntitiesOptions) {
     throw new Error("User delete is not available yet");
   }, []);
 
-  const distributors = useMemo(
-    () => entities.filter((entity) => entity.type === "distributor"),
+  const users = useMemo(
+    () => entities.filter((entity) => entity.type === "user"),
     [entities],
   );
   const suppliers = useMemo(
@@ -87,7 +87,7 @@ export function useAdminEntities(options?: UseAdminEntitiesOptions) {
     error,
     refetch: fetchUsers,
     entities,
-    distributors,
+    users,
     suppliers,
     recentUsers,
     addEntity,

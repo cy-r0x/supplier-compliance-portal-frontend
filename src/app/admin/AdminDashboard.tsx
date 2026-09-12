@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import {
   HiOutlineBell,
+  HiOutlineBuildingOffice2,
   HiOutlineClipboardDocumentList,
   HiOutlineCog6Tooth,
   HiOutlineHome,
@@ -36,6 +37,7 @@ import { useProductRequests } from "../distributor/useProductRequests";
 import type { ProductRequest } from "../distributor/types";
 import { statusLabel } from "../distributor/types";
 import Image from "next/image";
+import { OrganizationsSection } from "./OrganizationsSection";
 
 type ModalState =
   | { open: false }
@@ -46,7 +48,13 @@ type RoleFilter = "all" | EntityType;
 
 const NAV_ITEMS = [
   { id: "dashboard" as const, label: "Dashboard", icon: HiOutlineHome },
+  {
+    id: "organizations" as const,
+    label: "Organizations",
+    icon: HiOutlineBuildingOffice2,
+  },
   { id: "users" as const, label: "Users", icon: HiOutlineUsers },
+  { id: "suppliers" as const, label: "Suppliers", icon: HiOutlineUsers },
   {
     id: "products" as const,
     label: "Product requests",
@@ -130,7 +138,7 @@ function AdminDashboardInner() {
     error: usersError,
     refetch: refetchUsers,
     entities,
-    distributors,
+    users,
     suppliers,
     recentUsers,
     addEntity,
@@ -179,7 +187,7 @@ function AdminDashboardInner() {
     [router, searchParams],
   );
 
-  function openCreate(entityType: EntityType = "distributor") {
+  function openCreate(entityType: EntityType = "user") {
     setModal({ open: true, mode: "create", entityType });
   }
 
@@ -235,18 +243,25 @@ function AdminDashboardInner() {
         <DashboardSection
           recentUsers={recentUsers}
           recentRequests={productRequests.slice(0, 5)}
-          onCreateDistributor={() => openCreate("distributor")}
+          onCreateUser={() => openCreate("user")}
           onViewUsers={() => navigate("users")}
         />
-      ) : section === "users" ? (
+      ) : section === "organizations" ? (
+        <OrganizationsSection />
+      ) : section === "users" || section === "suppliers" ? (
         <UsersSection
-          entities={entities}
-          distributorCount={distributors.length}
+          entities={
+            section === "users"
+              ? entities.filter((entity) => entity.type === "user")
+              : entities.filter((entity) => entity.type === "supplier")
+          }
+          userCount={users.length}
           supplierCount={suppliers.length}
+          section={section}
           loading={usersLoading}
           error={usersError}
           onRetry={refetchUsers}
-          onCreate={() => openCreate("distributor")}
+          onCreate={() => openCreate(section === "users" ? "user" : "supplier")}
           onEdit={openEdit}
           onDelete={handleDelete}
         />
@@ -277,7 +292,7 @@ function AdminDashboardInner() {
       <EntityFormModal
         open={modal.open}
         mode={modal.open ? modal.mode : "create"}
-        entityType={modal.open ? modal.entityType : "distributor"}
+        entityType={modal.open ? modal.entityType : "user"}
         initial={modal.open && modal.mode === "edit" ? modal.entity : null}
         onClose={() => setModal({ open: false })}
         onSubmit={handleSubmit}
@@ -289,12 +304,12 @@ function AdminDashboardInner() {
 function DashboardSection({
   recentUsers,
   recentRequests,
-  onCreateDistributor,
+  onCreateUser,
   onViewUsers,
 }: {
   recentUsers: AdminEntity[];
   recentRequests: ProductRequest[];
-  onCreateDistributor: () => void;
+  onCreateUser: () => void;
   onViewUsers: () => void;
 }) {
   const latest = recentUsers.slice(0, 5);
@@ -303,14 +318,14 @@ function DashboardSection({
     <div>
       <PageHeader
         title="Dashboard"
-        description="What needs attention across distributors and suppliers"
+        description="What needs attention across organizations and suppliers"
         action={
           <button
             type="button"
-            onClick={onCreateDistributor}
+            onClick={onCreateUser}
             className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
           >
-            Create distributor
+            Create user
           </button>
         }
       />
@@ -345,14 +360,14 @@ function DashboardSection({
           {latest.length === 0 ? (
             <EmptyState
               title="No users yet"
-              description="Create a distributor to get started."
+              description="Create a user to get started."
               action={
                 <button
                   type="button"
-                  onClick={onCreateDistributor}
+                  onClick={onCreateUser}
                   className="h-9 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600"
                 >
-                  Create distributor
+                  Create user
                 </button>
               }
             />
@@ -399,7 +414,7 @@ function DashboardSection({
           {recentRequests.length === 0 ? (
             <EmptyState
               title="No product requests yet"
-              description="Requests created by distributors will show up here."
+              description="Requests created by organizations will show up here."
             />
           ) : (
             <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
@@ -439,8 +454,9 @@ function DashboardSection({
 
 function UsersSection({
   entities,
-  distributorCount,
+  userCount,
   supplierCount,
+  section,
   loading,
   error,
   onRetry,
@@ -449,8 +465,9 @@ function UsersSection({
   onDelete,
 }: {
   entities: AdminEntity[];
-  distributorCount: number;
+  userCount: number;
   supplierCount: number;
+  section: "users" | "suppliers";
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -476,8 +493,12 @@ function UsersSection({
   return (
     <div>
       <PageHeader
-        title="Users"
-        description={`${distributorCount} distributor${distributorCount === 1 ? "" : "s"} · ${supplierCount} supplier${supplierCount === 1 ? "" : "s"}`}
+        title={section === "users" ? "Users" : "Suppliers"}
+        description={
+          section === "users"
+            ? `${userCount} organization user${userCount === 1 ? "" : "s"}`
+            : `${supplierCount} supplier${supplierCount === 1 ? "" : "s"}`
+        }
         action={
           <button
             type="button"
@@ -509,7 +530,7 @@ function UsersSection({
           {(
             [
               ["all", "All"],
-              ["distributor", "Distributor"],
+              ["user", "User"],
               ["supplier", "Supplier"],
             ] as const
           ).map(([value, label]) => {
@@ -553,7 +574,7 @@ function UsersSection({
           title={entities.length === 0 ? "No users yet" : "No matching users"}
           description={
             entities.length === 0
-              ? "Create a distributor or supplier to populate this directory."
+              ? `Create a ${section === "users" ? "user" : "supplier"} to populate this directory.`
               : "Try a different search or role filter."
           }
           action={
@@ -649,7 +670,7 @@ function AdminProductsSection({
       (request) =>
         request.productName.toLowerCase().includes(q) ||
         request.supplierName.toLowerCase().includes(q) ||
-        request.distributorName.toLowerCase().includes(q),
+        request.organizationName.toLowerCase().includes(q),
     );
   }, [requests, search]);
 
@@ -657,7 +678,7 @@ function AdminProductsSection({
     <div>
       <PageHeader
         title="Product requests"
-        description="Browse compliance requests across distributors"
+        description="Browse compliance requests across organizations"
       />
 
       {error ? (
@@ -682,7 +703,7 @@ function AdminProductsSection({
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search product, supplier, or distributor"
+          placeholder="Search product, supplier, or organization"
           className="h-10 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25 sm:max-w-xs"
         />
       </div>
@@ -694,7 +715,7 @@ function AdminProductsSection({
           title={requests.length === 0 ? "No product requests yet" : "No matching requests"}
           description={
             requests.length === 0
-              ? "When distributors create requests, they will appear in this list."
+              ? "When organizations create requests, they will appear in this list."
               : "Try a different search."
           }
         />
@@ -704,7 +725,7 @@ function AdminProductsSection({
             <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Product</th>
-                <th className="px-4 py-2.5 font-medium">Distributor</th>
+                <th className="px-4 py-2.5 font-medium">Organization</th>
                 <th className="px-4 py-2.5 font-medium">Supplier</th>
                 <th className="px-4 py-2.5 font-medium">Progress</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
@@ -730,7 +751,7 @@ function AdminProductsSection({
                     </div>
                   </td>
                   <td className="px-4 py-2 text-text-secondary">
-                    {request.distributorName}
+                    {request.organizationName}
                   </td>
                   <td className="px-4 py-2 text-text-secondary">
                     {request.supplierName}

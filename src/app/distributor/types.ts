@@ -2,14 +2,16 @@ export type DistributorSection =
   | "dashboard"
   | "suppliers"
   | "templates"
+  | "team"
   | "products"
   | "notifications"
   | "settings";
 
-export const DISTRIBUTOR_SECTIONS: DistributorSection[] = [
+export const ORGANIZATION_SECTIONS: DistributorSection[] = [
   "dashboard",
   "suppliers",
   "templates",
+  "team",
   "products",
   "notifications",
   "settings",
@@ -18,7 +20,7 @@ export const DISTRIBUTOR_SECTIONS: DistributorSection[] = [
 export function isDistributorSection(
   value: string,
 ): value is DistributorSection {
-  return (DISTRIBUTOR_SECTIONS as string[]).includes(value);
+  return (ORGANIZATION_SECTIONS as string[]).includes(value);
 }
 
 export type ProductRequestStatus = "pending" | "approved" | "rejected";
@@ -36,6 +38,8 @@ export type ProductRequest = {
   progress: number;
   supplierId: string;
   supplierName: string;
+  organizationName: string;
+  /** Compatibility alias for legacy UI consumers. */
   distributorName: string;
   requestedAt: string;
   status: ProductRequestStatus;

@@ -203,7 +203,8 @@ export default function ProductReviewPage() {
   }, [rejectOpen, approveOpen, acting]);
 
   const canReview =
-    user?.role === "DISTRIBUTOR" || user?.role === "SUPER_ADMIN";
+    user?.role === "SUPER_ADMIN" ||
+    (user?.role === "USER" && Boolean(user.organization));
 
   const reviewStats = useMemo(() => {
     if (!product) return null;
@@ -278,7 +279,9 @@ export default function ProductReviewPage() {
 
   const request = apiDetailToProductRequest(product);
   const canAct =
-    product.status === "SUBMITTED" && user.role === "DISTRIBUTOR";
+    product.status === "SUBMITTED" &&
+    user.role === "USER" &&
+    user.organization?.role === "MANAGER";
   const missingRequired = reviewStats.total - reviewStats.completed;
 
   async function handleApprove() {

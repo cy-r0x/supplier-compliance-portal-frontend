@@ -178,7 +178,7 @@ export default function EntityFormModal({
                 }
                 className={fieldClass()}
               >
-                <option value="distributor">Distributor</option>
+                <option value="user">User</option>
                 <option value="supplier">Supplier</option>
               </select>
             </div>

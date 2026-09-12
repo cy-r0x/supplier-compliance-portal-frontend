@@ -1,15 +1,23 @@
 import { api } from "./axios";
 import { ApiError, type ApiResponse, type PaginationMeta } from "./types";
 
-export type ApiUserRole = "DISTRIBUTOR" | "SUPPLIER";
+export type ApiUserRole = "USER" | "SUPPLIER";
+
+export type ApiUserOrganization = {
+  membershipId: string;
+  role: "MANAGER" | "MEMBER";
+  id: string;
+  name: string;
+};
 
 export type ApiUser = {
   id: string;
   name: string;
   email: string;
-  role: ApiUserRole;
+  role: ApiUserRole | "SUPER_ADMIN";
   photo: string | null;
   createdAt: string;
+  organization: ApiUserOrganization | null;
 };
 
 export type ListUsersParams = {

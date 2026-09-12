@@ -16,10 +16,10 @@ import {
   HiOutlinePencilSquare,
   HiOutlineTrash,
   HiOutlineTruck,
+  HiOutlineUsers,
   HiOutlineXMark,
 } from "react-icons/hi2";
 import ProductThumbnail from "@/components/products/ProductThumbnail";
-import { getSettings } from "@/lib/api/settings-api";
 import { useNotifications } from "../../lib/useNotifications";
 import AppShell from "../../../components/layouts/AppShell";
 import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
@@ -42,6 +42,16 @@ import type {
 } from "./types";
 import { isDistributorSection, statusLabel } from "./types";
 import { useProductRequests } from "./useProductRequests";
+import {
+  addOrganizationMember,
+  getOrganization,
+  getOrganizationSettings,
+  removeOrganizationMember,
+  updateOrganizationMember,
+  type OrganizationDetail,
+  type OrganizationMemberRole,
+} from "@/lib/api/organizations-api";
+import { listUsers, type ApiUser } from "@/lib/api/users-api";
 
 type SupplierModalState =
   | { open: false }
@@ -56,6 +66,7 @@ const NAV_ITEMS = [
     label: "Templates",
     icon: HiOutlineDocumentDuplicate,
   },
+  { id: "team" as const, label: "Team", icon: HiOutlineUsers },
   {
     id: "products" as const,
     label: "Product request",
@@ -288,6 +299,16 @@ function DistributorDashboardInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const isManager = user?.organization?.role === "MANAGER";
+  const navItems = useMemo(
+    () =>
+      isManager
+        ? NAV_ITEMS
+        : NAV_ITEMS.filter(
+            (item) => item.id !== "suppliers" && item.id !== "templates" && item.id !== "team",
+          ),
+    [isManager],
+  );
 
   const {
     ready: entitiesReady,
@@ -405,7 +426,7 @@ function DistributorDashboardInner() {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <AppShell
-        navItems={NAV_ITEMS}
+        navItems={navItems}
         activeNavId={section}
         onNavigate={navigate}
         notificationCount={unreadCount}
@@ -423,24 +444,29 @@ function DistributorDashboardInner() {
           </div>
         ) : section === "dashboard" ? (
           <DashboardSection
+            organizationName={user?.organization?.name}
+            organizationRole={user?.organization?.role}
             requests={requests}
             supplierCount={suppliers.length}
             unreadCount={unreadCount}
             onCreateRequest={openCreateRequest}
             onCreateSupplier={openCreateSupplier}
+            canManage={isManager}
             onViewRequests={() => navigate("products")}
             onViewNotifications={() => navigate("notifications")}
             onOpenRequest={(request) => router.push(requestHref(request))}
           />
-        ) : section === "suppliers" ? (
+        ) : section === "suppliers" && isManager ? (
           <SuppliersSection
             suppliers={suppliers}
             onCreate={openCreateSupplier}
             onEdit={openEditSupplier}
             onDelete={handleDeleteSupplier}
           />
-        ) : section === "templates" ? (
+        ) : section === "templates" && isManager ? (
           <TemplatesSection />
+        ) : section === "team" && isManager && user?.organization ? (
+          <TeamSection organizationId={user.organization.id} />
         ) : section === "products" ? (
           <ProductRequestsSection
             requests={requests}
@@ -452,6 +478,7 @@ function DistributorDashboardInner() {
             onView={openViewSubmission}
             onCreateSupplier={openCreateSupplier}
             onOpenSettings={() => navigate("settings")}
+            canManage={isManager}
           />
         ) : section === "notifications" ? (
           <NotificationsInbox
@@ -568,6 +595,8 @@ function DashboardRequestRow({
 }
 
 function DashboardSection({
+  organizationName,
+  organizationRole,
   requests,
   supplierCount,
   unreadCount,
@@ -576,7 +605,10 @@ function DashboardSection({
   onViewRequests,
   onViewNotifications,
   onOpenRequest,
+  canManage,
 }: {
+  organizationName?: string;
+  organizationRole?: "MANAGER" | "MEMBER";
   requests: ProductRequest[];
   supplierCount: number;
   unreadCount: number;
@@ -585,6 +617,7 @@ function DashboardSection({
   onViewRequests: () => void;
   onViewNotifications: () => void;
   onOpenRequest: (request: ProductRequest) => void;
+  canManage: boolean;
 }) {
   const awaitingReview = useMemo(
     () =>
@@ -611,13 +644,23 @@ function DashboardSection({
 
   const hasNoSuppliers = supplierCount === 0;
   const hasNoRequests = requests.length === 0;
+  const orgRoleLabel =
+    organizationRole === "MANAGER"
+      ? "Manager"
+      : organizationRole === "MEMBER"
+        ? "Member"
+        : null;
 
   return (
     <div>
       <PageHeader
-        title="Dashboard"
-        description="What needs your attention right now"
-        action={
+        title={organizationName ?? "Dashboard"}
+        description={
+          organizationName
+            ? `Signed in as ${orgRoleLabel ?? "member"} · What needs attention`
+            : "What needs your attention right now"
+        }
+        action={canManage ? (
           <button
             type="button"
             onClick={onCreateRequest}
@@ -626,10 +669,10 @@ function DashboardSection({
           >
             New product request
           </button>
-        }
+        ) : undefined}
       />
 
-      {hasNoSuppliers ? (
+      {hasNoSuppliers && canManage ? (
         <EmptyState
           title="Add your first supplier"
           description="Create a supplier account before sending product compliance requests."
@@ -647,7 +690,7 @@ function DashboardSection({
         <EmptyState
           title="No product requests yet"
           description="Create a request to start collecting compliance from your suppliers."
-          action={
+          action={canManage ? (
             <button
               type="button"
               onClick={onCreateRequest}
@@ -655,7 +698,7 @@ function DashboardSection({
             >
               New product request
             </button>
-          }
+          ) : undefined}
         />
       ) : (
         <div className="space-y-4">
@@ -874,9 +917,11 @@ function ProductRequestActions({
   onView: (request: ProductRequest) => void;
   layout?: "table" | "compact";
 }) {
+  const { user } = useAuth();
+  const canManage = user?.organization?.role === "MANAGER";
   const stop = (event: MouseEvent) => event.stopPropagation();
 
-  if (request.apiStatus === "PENDING") {
+  if (request.apiStatus === "PENDING" && canManage) {
     return (
       <div
         className={`inline-flex items-center rounded-[8px] border border-border-subtle bg-bg-muted/30 p-0.5 ${
@@ -905,8 +950,9 @@ function ProductRequestActions({
   }
 
   const viewLabel =
-    request.apiStatus === "SUBMITTED" ? "Review" : "View submission";
-  const viewVariant = request.apiStatus === "SUBMITTED" ? "primary" : "ghost";
+    request.apiStatus === "SUBMITTED" && canManage ? "Review" : "View submission";
+  const viewVariant =
+    request.apiStatus === "SUBMITTED" && canManage ? "primary" : "ghost";
   const showQr =
     request.apiStatus === "APPROVED" && Boolean(request.publicSlug);
 
@@ -1068,6 +1114,7 @@ function ProductRequestsSection({
   onView,
   onCreateSupplier,
   onOpenSettings,
+  canManage,
 }: {
   requests: ProductRequest[];
   supplierCount: number;
@@ -1078,21 +1125,24 @@ function ProductRequestsSection({
   onView: (request: ProductRequest) => void;
   onCreateSupplier: () => void;
   onOpenSettings: () => void;
+  canManage: boolean;
 }) {
   const router = useRouter();
+  const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<RequestStatusFilter>("all");
   const [autoApproveEnabled, setAutoApproveEnabled] = useState(false);
 
   useEffect(() => {
-    getSettings()
+    if (!canManage || !user?.organization) return;
+    getOrganizationSettings(user.organization.id)
       .then((settings) =>
         setAutoApproveEnabled(settings.autoApproveProductRequests),
       )
       .catch(() => {
         setAutoApproveEnabled(false);
       });
-  }, []);
+  }, [canManage, user?.organization]);
 
   const stats = useMemo(
     () => ({
@@ -1156,7 +1206,7 @@ function ProductRequestsSection({
       <PageHeader
         title="Product requests"
         description="Track products requested from your suppliers"
-        action={
+        action={canManage ? (
           <button
             type="button"
             onClick={onCreate}
@@ -1165,10 +1215,10 @@ function ProductRequestsSection({
           >
             New request
           </button>
-        }
+        ) : undefined}
       />
 
-      {autoApproveEnabled ? (
+      {autoApproveEnabled && canManage ? (
         <div
           className="mb-4 flex flex-col gap-3 rounded-[12px] border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
           role="status"
@@ -1199,11 +1249,11 @@ function ProductRequestsSection({
         </p>
       ) : null}
 
-      {supplierCount === 0 ? (
+      {supplierCount === 0 && canManage ? (
         <EmptyState
           title="Add a supplier first"
           description="You need at least one supplier before creating a product request."
-          action={
+          action={canManage ? (
             <button
               type="button"
               onClick={onCreateSupplier}
@@ -1211,7 +1261,7 @@ function ProductRequestsSection({
             >
               Create new supplier
             </button>
-          }
+          ) : undefined}
         />
       ) : requests.length === 0 ? (
         <EmptyState
@@ -1345,8 +1395,8 @@ function ProductRequestsSection({
                     key={request.id}
                     request={request}
                     onOpen={openRequest}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
+                    onEdit={canManage ? onEdit : onView}
+                    onDelete={canManage ? onDelete : onView}
                     onView={onView}
                   />
                 ))}
@@ -1373,8 +1423,8 @@ function ProductRequestsSection({
                           key={request.id}
                           request={request}
                           onOpen={openRequest}
-                          onEdit={onEdit}
-                          onDelete={onDelete}
+                          onEdit={canManage ? onEdit : onView}
+                          onDelete={canManage ? onDelete : onView}
                           onView={onView}
                         />
                       ))}
@@ -1385,6 +1435,237 @@ function ProductRequestsSection({
             </>
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+function TeamSection({ organizationId }: { organizationId: string }) {
+  const [organization, setOrganization] = useState<OrganizationDetail | null>(null);
+  const [candidates, setCandidates] = useState<ApiUser[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [selectedRole, setSelectedRole] =
+    useState<OrganizationMemberRole>("MEMBER");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [detail, users] = await Promise.all([
+        getOrganization(organizationId),
+        listUsers({ role: "USER", limit: 100, sort: "name:asc" }),
+      ]);
+      setOrganization(detail);
+      const available = users.items.filter(
+        (candidate) => !candidate.organization,
+      );
+      setCandidates(available);
+      setSelectedUserId(
+        available.find(
+          (candidate) =>
+            !detail.members.some((member) => member.user.id === candidate.id),
+        )?.id ?? "",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load team");
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const addableUsers = candidates.filter(
+    (candidate) =>
+      !candidate.organization &&
+      !organization?.members.some((member) => member.user.id === candidate.id),
+  );
+
+  async function handleAdd() {
+    if (!selectedUserId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await addOrganizationMember(organizationId, {
+        userId: selectedUserId,
+        role: selectedRole,
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add team member");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const managerCount =
+    organization?.members.filter((member) => member.role === "MANAGER").length ??
+    0;
+
+  async function handleRoleChange(
+    membershipId: string,
+    role: OrganizationMemberRole,
+  ) {
+    const target = organization?.members.find(
+      (member) => member.id === membershipId,
+    );
+    if (
+      target?.role === "MANAGER" &&
+      role === "MEMBER" &&
+      managerCount === 1
+    ) {
+      setError("Cannot demote the last manager of an organization");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await updateOrganizationMember(organizationId, membershipId, { role });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update member");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRemove(membershipId: string, name: string) {
+    if (!window.confirm(`Remove ${name} from this organization?`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await removeOrganizationMember(organizationId, membershipId);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove member");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Team"
+        description={`Manage access to ${organization?.name ?? "your organization"}`}
+      />
+      {error ? (
+        <p className="mb-4 rounded-[9px] border border-danger-500/30 bg-danger-50 px-4 py-3 text-[13px] text-danger-500">
+          {error}
+        </p>
+      ) : null}
+      <section className="mb-5 rounded-[12px] border border-border-subtle bg-bg-elevated p-4">
+        <h2 className="text-[14px] font-medium text-text-primary">Add member</h2>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <select
+            value={selectedUserId}
+            disabled={saving || addableUsers.length === 0}
+            onChange={(event) => setSelectedUserId(event.target.value)}
+            className="h-10 min-w-0 flex-1 rounded-[9px] border border-border-subtle bg-bg-app px-3 text-[13px]"
+          >
+            {addableUsers.length === 0 ? (
+              <option value="">No unassigned users available</option>
+            ) : (
+              addableUsers.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.name} ({candidate.email})
+                </option>
+              ))
+            )}
+          </select>
+          <select
+            value={selectedRole}
+            disabled={saving}
+            onChange={(event) =>
+              setSelectedRole(event.target.value as OrganizationMemberRole)
+            }
+            className="h-10 rounded-[9px] border border-border-subtle bg-bg-app px-3 text-[13px]"
+          >
+            <option value="MEMBER">Member</option>
+            <option value="MANAGER">Manager</option>
+          </select>
+          <button
+            type="button"
+            disabled={saving || !selectedUserId}
+            onClick={() => void handleAdd()}
+            className="h-10 rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse disabled:opacity-60"
+          >
+            Add to team
+          </button>
+        </div>
+      </section>
+      {loading ? (
+        <SkeletonRows />
+      ) : (
+        <div className="overflow-x-auto rounded-[12px] border border-border-subtle bg-bg-elevated">
+          <table className="min-w-full text-left text-[13px]">
+            <thead className="border-b border-border-subtle bg-bg-muted/50 text-[12px] text-text-muted">
+              <tr>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Organization role</th>
+                <th className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {organization?.members.map((member) => {
+                const isLastManager =
+                  member.role === "MANAGER" && managerCount === 1;
+                return (
+                <tr key={member.id}>
+                  <td className="px-4 py-3 font-medium text-text-primary">
+                    {member.user.name}
+                    {isLastManager ? (
+                      <p className="mt-0.5 text-[11px] font-normal text-text-muted">
+                        Last manager — add another before removing or demoting.
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-text-secondary">{member.user.email}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={member.role}
+                      disabled={saving}
+                      onChange={(event) =>
+                        void handleRoleChange(
+                          member.id,
+                          event.target.value as OrganizationMemberRole,
+                        )
+                      }
+                      className="h-9 rounded-[8px] border border-border-subtle bg-bg-app px-2 text-[12px]"
+                    >
+                      <option value="MEMBER" disabled={isLastManager}>
+                        Member
+                      </option>
+                      <option value="MANAGER">Manager</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      disabled={saving || isLastManager}
+                      title={
+                        isLastManager
+                          ? "Cannot remove the last manager"
+                          : undefined
+                      }
+                      onClick={() => void handleRemove(member.id, member.user.name)}
+                      className="rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-danger-500 hover:bg-danger-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

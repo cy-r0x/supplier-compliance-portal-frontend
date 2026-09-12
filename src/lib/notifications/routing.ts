@@ -6,7 +6,7 @@ export function getNotificationProductPath(
   productRequestId: string,
   _type?: NotificationType,
 ): string {
-  if (role === "DISTRIBUTOR" || role === "SUPER_ADMIN") {
+  if (role === "USER" || role === "SUPER_ADMIN") {
     return `/products/${productRequestId}/review`;
   }
 

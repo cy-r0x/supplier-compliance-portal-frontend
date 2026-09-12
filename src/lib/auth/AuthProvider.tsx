@@ -42,6 +42,8 @@ function mergeProfile(user: AuthUser, profile: ApiUser): AuthUser {
     name: profile.name,
     email: profile.email,
     photo: profile.photo,
+    role: profile.role,
+    organization: profile.organization,
   };
 }
 

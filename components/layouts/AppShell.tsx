@@ -5,13 +5,32 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { IconType } from "react-icons";
 import {
   HiOutlineBell,
+  HiOutlineBuildingOffice2,
   HiOutlineChevronDoubleLeft,
   HiOutlineChevronDoubleRight,
 } from "react-icons/hi2";
 import UserAvatar from "@/components/user/UserAvatar";
 import { useAuth } from "../../src/lib/auth/AuthProvider";
+import type { AuthOrganization, UserRole } from "../../src/lib/auth/session";
 
 const COLLAPSE_STORAGE_KEY = "scp-sidebar-collapsed";
+
+function formatSystemRole(role: UserRole | string): string {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "Super admin";
+    case "SUPPLIER":
+      return "Supplier";
+    case "USER":
+      return "User";
+    default:
+      return role;
+  }
+}
+
+function formatOrgRole(role: AuthOrganization["role"]): string {
+  return role === "MANAGER" ? "Manager" : "Member";
+}
 
 function formatNotificationCount(count: number): string {
   if (count > 99) return "99+";
@@ -65,7 +84,11 @@ export default function AppShell({
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const userName = user?.name ?? "";
-  const userRole = user?.role ?? "";
+  const organization = user?.organization ?? null;
+  const orgRoleLabel = organization ? formatOrgRole(organization.role) : null;
+  const systemRoleLabel = user?.role ? formatSystemRole(user.role) : "";
+  // Org name in workspace chip; role under the profile name.
+  const headerSubtitle = orgRoleLabel ?? systemRoleLabel;
 
   useEffect(() => {
     try {
@@ -122,36 +145,38 @@ export default function AppShell({
     <div className="flex min-h-0 flex-1 flex-col bg-bg-app text-text-primary">
       <header className="sticky top-0 z-30 border-b border-border-subtle bg-bg-elevated">
         <div className="flex h-14 items-center justify-between gap-4 px-4 sm:px-6">
-          <Link
-            href="/dashboard"
-            className="flex min-w-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-          >
-            <span
-              className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-brand-500 text-text-inverse"
-              aria-hidden="true"
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+            <Link
+              href="/dashboard"
+              className="flex min-w-0 items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
             >
-              <svg className="size-4" fill="none" viewBox="0 0 24 24">
-                <path
-                  d="M12 3 4 7v5c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V7l-8-4Z"
-                  stroke="currentColor"
-                  strokeLinejoin="round"
-                  strokeWidth="1.7"
-                />
-                <path
-                  d="m9 12 2 2 4-4"
-                  stroke="currentColor"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="1.7"
-                />
-              </svg>
-            </span>
-            <span className="truncate font-display text-[15px] font-semibold tracking-[-0.02em] text-text-primary">
-              Compliance Portal
-            </span>
-          </Link>
+              <span
+                className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-brand-500 text-text-inverse"
+                aria-hidden="true"
+              >
+                <svg className="size-4" fill="none" viewBox="0 0 24 24">
+                  <path
+                    d="M12 3 4 7v5c0 5 3.4 8.7 8 9 4.6-.3 8-4 8-9V7l-8-4Z"
+                    stroke="currentColor"
+                    strokeLinejoin="round"
+                    strokeWidth="1.7"
+                  />
+                  <path
+                    d="m9 12 2 2 4-4"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.7"
+                  />
+                </svg>
+              </span>
+              <span className="truncate font-display text-[15px] font-semibold tracking-[-0.02em] text-text-primary">
+                Compliance Portal
+              </span>
+            </Link>
+          </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
               aria-label={
@@ -180,11 +205,15 @@ export default function AppShell({
                 onClick={() => setProfileOpen((open) => !open)}
                 className="flex cursor-pointer items-center gap-2.5 rounded-[9px] py-1 pr-1 pl-2 transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
               >
-                <div className="hidden min-w-0 text-right sm:block">
+                <div className="hidden min-w-0 max-w-[160px] text-right sm:block lg:max-w-[220px]">
                   <p className="truncate text-[13px] font-medium text-text-primary">
                     {userName}
                   </p>
-                  <p className="truncate text-[11px] text-text-muted">{userRole}</p>
+                  {headerSubtitle ? (
+                    <p className="truncate text-[11px] text-text-muted">
+                      {headerSubtitle}
+                    </p>
+                  ) : null}
                 </div>
                 <UserAvatar src={user?.photo} size={32} />
               </button>
@@ -192,12 +221,34 @@ export default function AppShell({
               <div
                 role="menu"
                 aria-label="Profile"
-                className={`absolute right-0 top-full z-40 mt-1 w-44 origin-top-right rounded-[9px] border border-border-subtle bg-bg-elevated py-1 shadow-sm transition duration-150 ${
+                className={`absolute right-0 top-full z-40 mt-1 w-60 origin-top-right rounded-[9px] border border-border-subtle bg-bg-elevated py-1 shadow-sm transition duration-150 ${
                   profileOpen
                     ? "visible opacity-100"
                     : "pointer-events-none invisible opacity-0"
                 }`}
               >
+                <div className="border-b border-border-subtle px-3.5 py-2.5">
+                  <p className="truncate text-[13px] font-medium text-text-primary">
+                    {userName}
+                  </p>
+                  <p className="mt-0.5 truncate text-[11px] text-text-muted">
+                    {user?.email}
+                  </p>
+                  {organization ? (
+                    <div className="mt-2 rounded-[8px] bg-bg-muted/70 px-2.5 py-2">
+                      <p className="truncate text-[12px] font-medium text-text-primary">
+                        {organization.name}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-text-muted">
+                        Organization role · {orgRoleLabel}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-1.5 text-[11px] text-text-muted">
+                      {systemRoleLabel}
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   role="menuitem"
@@ -261,6 +312,41 @@ export default function AppShell({
             </button>
           </div>
 
+          {organization ? (
+            <div
+              className={`border-b border-border-subtle ${
+                collapsed ? "px-2 py-2" : "px-3 py-3"
+              }`}
+            >
+              {collapsed ? (
+                <div
+                  className="mx-auto flex size-9 items-center justify-center rounded-[9px] bg-brand-100/60 text-brand-700"
+                  title={`${organization.name} · ${orgRoleLabel}`}
+                >
+                  <HiOutlineBuildingOffice2
+                    aria-hidden="true"
+                    className="size-4"
+                  />
+                  <span className="sr-only">
+                    {organization.name}, {orgRoleLabel}
+                  </span>
+                </div>
+              ) : (
+                <div className="rounded-[9px] bg-bg-muted/70 px-3 py-2.5">
+                  <p className="text-[10px] font-medium tracking-[0.04em] text-text-muted uppercase">
+                    Organization
+                  </p>
+                  <p className="mt-1 truncate text-[13px] font-medium text-text-primary">
+                    {organization.name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-text-secondary">
+                    Your role · {orgRoleLabel}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           <nav
             id="app-shell-nav"
             className="flex flex-col gap-0.5 p-2"
@@ -322,6 +408,22 @@ export default function AppShell({
             className="flex gap-1 overflow-x-auto border-b border-border-subtle bg-bg-elevated px-3 py-2 md:hidden"
             aria-label="Primary mobile"
           >
+            {organization ? (
+              <div className="mr-1 flex min-w-0 max-w-[42%] shrink-0 items-center gap-1.5 rounded-[9px] bg-bg-muted/80 px-2.5 py-2">
+                <HiOutlineBuildingOffice2
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-text-muted"
+                />
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-medium text-text-primary">
+                    {organization.name}
+                  </p>
+                  <p className="truncate text-[10px] text-text-muted">
+                    {orgRoleLabel}
+                  </p>
+                </div>
+              </div>
+            ) : null}
             {resolvedNavItems.map((item) => {
               const active = activeNavId === item.id;
               const Icon = item.icon;

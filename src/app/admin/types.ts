@@ -1,4 +1,4 @@
-export type EntityType = "distributor" | "supplier";
+export type EntityType = "user" | "supplier";
 
 export type AdminEntity = {
   id: string;
@@ -17,14 +17,18 @@ export type EntityFormValues = {
 
 export type AdminSection =
   | "dashboard"
+  | "organizations"
   | "users"
+  | "suppliers"
   | "products"
   | "notifications"
   | "settings";
 
 export const ADMIN_SECTIONS: AdminSection[] = [
   "dashboard",
+  "organizations",
   "users",
+  "suppliers",
   "products",
   "notifications",
   "settings",
@@ -35,7 +39,7 @@ export function isAdminSection(value: string): value is AdminSection {
 }
 
 export function roleLabel(type: EntityType): string {
-  return type === "distributor" ? "Distributor" : "Supplier";
+  return type === "user" ? "User" : "Supplier";
 }
 
 export function formatDate(iso: string): string {

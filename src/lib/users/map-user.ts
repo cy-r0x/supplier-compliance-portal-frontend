@@ -7,11 +7,11 @@ export function apiUserToAdminEntity(user: ApiUser): AdminEntity {
     name: user.name,
     email: user.email,
     password: "",
-    type: user.role === "DISTRIBUTOR" ? "distributor" : "supplier",
+    type: user.role === "USER" ? "user" : "supplier",
     createdAt: user.createdAt,
   };
 }
 
-export function entityTypeToApiRole(type: EntityType): "DISTRIBUTOR" | "SUPPLIER" {
-  return type === "distributor" ? "DISTRIBUTOR" : "SUPPLIER";
+export function entityTypeToApiRole(type: EntityType): "USER" | "SUPPLIER" {
+  return type === "user" ? "USER" : "SUPPLIER";
 }

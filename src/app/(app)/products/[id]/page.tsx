@@ -209,7 +209,7 @@ function SubmitSuccessTooltip({
             Submitted successfully
           </p>
           <p className="mt-1 text-[12px] text-text-secondary">
-            After distributor approval, public fields will appear on{" "}
+            After organization approval, public fields will appear on{" "}
             <Link
               href={`/p/${publicSlug}`}
               className="font-medium text-brand-600 hover:text-brand-700"
@@ -531,7 +531,7 @@ export default function ProductCompliancePage() {
                   <p className="mt-1 text-[13px] text-text-secondary">
                     Requested by{" "}
                     <span className="font-medium text-text-primary">
-                      {request.distributorName}
+                      {request.organizationName}
                     </span>
                   </p>
                   {product.rejectionReason ? (
@@ -701,7 +701,7 @@ export default function ProductCompliancePage() {
                 <p className="mt-1 text-[13px] text-text-secondary">
                   Requested by{" "}
                   <span className="font-medium text-text-primary">
-                    {request.distributorName}
+                    {request.organizationName}
                   </span>
                 </p>
               </div>

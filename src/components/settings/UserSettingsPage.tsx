@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { getSettings, updateSettings } from "@/lib/api/settings-api";
+import {
+  getOrganizationSettings,
+  updateOrganizationSettings,
+} from "@/lib/api/organizations-api";
 import { updateMyProfilePhoto } from "@/lib/api/users-api";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { toProxiedMediaUrl } from "@/lib/media-url";
@@ -142,7 +145,8 @@ function ToggleSwitch({
 
 export default function UserSettingsPage() {
   const { user, updateUser } = useAuth();
-  const isDistributor = user?.role === "DISTRIBUTOR";
+  const canManageOrganization =
+    user?.role === "USER" && user.organization?.role === "MANAGER";
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     user?.photo ?? null,
   );
@@ -150,7 +154,7 @@ export default function UserSettingsPage() {
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoSaved, setPhotoSaved] = useState(false);
   const [autoApprove, setAutoApprove] = useState(false);
-  const [loading, setLoading] = useState(isDistributor);
+  const [loading, setLoading] = useState(canManageOrganization);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -160,17 +164,17 @@ export default function UserSettingsPage() {
   }, [user?.photo]);
 
   useEffect(() => {
-    if (!isDistributor) return;
+    if (!canManageOrganization || !user?.organization) return;
 
     setLoading(true);
     setError(null);
-    getSettings()
+    getOrganizationSettings(user.organization.id)
       .then((settings) => setAutoApprove(settings.autoApproveProductRequests))
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Failed to load settings"),
       )
       .finally(() => setLoading(false));
-  }, [isDistributor]);
+  }, [canManageOrganization, user?.organization]);
 
   async function handlePhotoSelect(file: File) {
     if (!file.type.startsWith("image/")) {
@@ -218,7 +222,8 @@ export default function UserSettingsPage() {
     setSaved(false);
 
     try {
-      const settings = await updateSettings({
+      if (!user?.organization) return;
+      const settings = await updateOrganizationSettings(user.organization.id, {
         autoApproveProductRequests: next,
       });
       setAutoApprove(settings.autoApproveProductRequests);
@@ -269,18 +274,44 @@ export default function UserSettingsPage() {
               </dd>
             </div>
             <div>
-              <dt className="text-[12px] text-text-muted">Role</dt>
+              <dt className="text-[12px] text-text-muted">Account type</dt>
               <dd className="mt-1 text-[13px] text-text-primary">
-                {user?.role ?? "—"}
+                {user?.role === "SUPER_ADMIN"
+                  ? "Super admin"
+                  : user?.role === "SUPPLIER"
+                    ? "Supplier"
+                    : user?.role === "USER"
+                      ? "Organization user"
+                      : (user?.role ?? "—")}
               </dd>
             </div>
+            {user?.organization ? (
+              <>
+                <div>
+                  <dt className="text-[12px] text-text-muted">Organization</dt>
+                  <dd className="mt-1 text-[13px] text-text-primary">
+                    {user.organization.name}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[12px] text-text-muted">
+                    Organization role
+                  </dt>
+                  <dd className="mt-1 text-[13px] text-text-primary">
+                    {user.organization.role === "MANAGER"
+                      ? "Manager"
+                      : "Member"}
+                  </dd>
+                </div>
+              </>
+            ) : null}
           </dl>
           <p className="mt-4 text-[12px] text-text-muted">
             Password change will be available in a later release.
           </p>
         </section>
 
-        {isDistributor ? (
+        {canManageOrganization ? (
           <section className="rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
             <h2 className="text-[15px] font-medium text-text-primary">
               Product request defaults

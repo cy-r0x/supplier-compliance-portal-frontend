@@ -272,7 +272,7 @@ function DashboardSection({
     <div>
       <PageHeader
         title="Dashboard"
-        description="Status overview of product requests from distributors"
+        description="Status overview of product requests from organizations"
         action={
           <button
             type="button"
@@ -319,7 +319,7 @@ function ProductRequestsSection({
     return requests.filter(
       (request) =>
         request.productName.toLowerCase().includes(q) ||
-        request.distributorName.toLowerCase().includes(q),
+        request.organizationName.toLowerCase().includes(q),
     );
   }, [requests, search]);
 
@@ -327,13 +327,13 @@ function ProductRequestsSection({
     <div>
       <PageHeader
         title="Product request"
-        description="Requests submitted by distributors"
+        description="Requests submitted by organizations"
       />
 
       {requests.length === 0 ? (
         <EmptyState
           title="No product requests yet"
-          description="When a distributor requests a product, it will appear here."
+          description="When an organization requests a product, it will appear here."
         />
       ) : (
         <>
@@ -346,7 +346,7 @@ function ProductRequestsSection({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search product or distributor"
+              placeholder="Search product or organization"
               className="h-10 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-text-muted focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25 sm:max-w-xs"
             />
           </div>
@@ -363,7 +363,7 @@ function ProductRequestsSection({
                   <tr>
                     <th className="px-4 py-2.5 font-medium">Product</th>
                     <th className="px-4 py-2.5 font-medium">Progress</th>
-                    <th className="px-4 py-2.5 font-medium">Distributor</th>
+                    <th className="px-4 py-2.5 font-medium">Organization</th>
                     <th className="px-4 py-2.5 font-medium">Date</th>
                     <th className="px-4 py-2.5 font-medium">
                       <span className="sr-only">Actions</span>
@@ -392,7 +392,7 @@ function ProductRequestsSection({
                         <ProgressCircle value={request.progress} />
                       </td>
                       <td className="px-4 py-2 text-text-secondary">
-                        {request.distributorName}
+                        {request.organizationName}
                       </td>
                       <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
                         {formatDate(request.requestedAt)}

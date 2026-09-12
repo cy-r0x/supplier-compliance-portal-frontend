@@ -28,7 +28,7 @@ export type ApiProductListItem = {
   publicSlug: string;
   createdAt: string;
   updatedAt: string;
-  distributor: ApiProductParty;
+  organization: Pick<ApiProductParty, "id" | "name">;
   supplier: ApiProductParty;
   progress: ApiProductProgress;
 };
@@ -108,7 +108,8 @@ export function apiProductToProductRequest(
     progress: product.progress.percent,
     supplierId: product.supplier.id,
     supplierName: product.supplier.name,
-    distributorName: product.distributor.name,
+    organizationName: product.organization.name,
+    distributorName: product.organization.name,
     requestedAt: product.createdAt,
     status: mapApiStatus(product.status),
     submitted: product.status === "SUBMITTED" || product.status === "APPROVED",

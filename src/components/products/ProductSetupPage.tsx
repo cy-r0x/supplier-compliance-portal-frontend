@@ -145,7 +145,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
   const preselectedSupplier = searchParams.get("supplierId");
 
   useEffect(() => {
-    if (user?.role !== "DISTRIBUTOR") return;
+    if (user?.role !== "USER" || user.organization?.role !== "MANAGER") return;
 
     if (isEdit && productId) {
       setLoadingProduct(true);
@@ -199,7 +199,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
       })
       .catch(() => setFormError("Failed to load suppliers or templates"))
       .finally(() => setLoadingSuppliers(false));
-  }, [user?.role, preselectedSupplier, isEdit, productId]);
+  }, [user?.role, user?.organization?.role, preselectedSupplier, isEdit, productId]);
 
   async function applyTemplate(id: string) {
     if (!id) {
@@ -274,7 +274,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
 
   if (!user) return null;
 
-  if (user.role !== "DISTRIBUTOR") {
+  if (user.role !== "USER" || user.organization?.role !== "MANAGER") {
     return (
       <div className="flex min-h-full flex-1 flex-col items-center justify-center bg-bg-app px-4 text-center">
         <p className="text-[15px] font-medium text-text-primary">Access denied</p>
