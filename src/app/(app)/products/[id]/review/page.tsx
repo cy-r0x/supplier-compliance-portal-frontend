@@ -232,52 +232,69 @@ export default function ProductReviewPage() {
             <div className="mt-4 space-y-4">
               {product.documentRequirements.map((doc) => {
                 const label = publicDocumentLabel(doc.type, doc.label);
-                const fileName = doc.document?.fileName ?? "";
-                const fileUrl = doc.document?.fileUrl;
+                const files = doc.documents.filter(
+                  (item) => item.fileUrl && item.fileName,
+                );
                 return (
                   <div
                     key={doc.id}
                     className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="text-[13px] font-medium text-text-primary">{label}</p>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-medium text-text-primary">{label}</p>
+                        <p className="mt-1 text-[11px] text-text-muted">
+                          {files.length} file{files.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
                       <RequirementMeta level={doc.level} visibility={doc.visibility} />
                     </div>
-                    {fileUrl && fileName ? (
-                      <div className="mt-3 space-y-3">
-                        {isImageFileName(fileName) ? (
-                          <button
-                            type="button"
-                            onClick={() => openFromUrl(label, fileName, fileUrl)}
-                            className="block overflow-hidden rounded-[10px] border border-border-subtle bg-bg-muted"
-                            aria-label={`Preview ${label}`}
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={toProxiedMediaUrl(fileUrl) || fileUrl}
-                              alt=""
-                              className="h-36 w-full max-w-sm object-contain"
-                            />
-                          </button>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-3">
-                          <span className="text-[12px] text-text-muted">{fileName}</span>
-                          <a
-                            href={toProxiedMediaUrl(fileUrl) || fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
-                          >
-                            Download
-                          </a>
-                          {isPdfFileName(fileName) || isImageFileName(fileName) ? (
-                            <PublicDocumentPreviewButton
-                              fileName={fileName}
-                              previewUrl={fileUrl}
-                              onPreview={() => openFromUrl(label, fileName, fileUrl)}
-                            />
-                          ) : null}
-                        </div>
+                    {files.length > 0 ? (
+                      <div className="mt-3 space-y-4">
+                        {files.map((file) => (
+                          <div key={file.id} className="space-y-3">
+                            {isImageFileName(file.fileName!) ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openFromUrl(label, file.fileName!, file.fileUrl)
+                                }
+                                className="block overflow-hidden rounded-[10px] border border-border-subtle bg-bg-muted"
+                                aria-label={`Preview ${label}`}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={toProxiedMediaUrl(file.fileUrl) || file.fileUrl}
+                                  alt=""
+                                  className="h-36 w-full max-w-sm object-contain"
+                                />
+                              </button>
+                            ) : null}
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-[12px] text-text-muted">
+                                {file.fileName}
+                              </span>
+                              <a
+                                href={toProxiedMediaUrl(file.fileUrl) || file.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[12px] font-medium text-brand-600 hover:text-brand-700"
+                              >
+                                Download
+                              </a>
+                              {isPdfFileName(file.fileName!) ||
+                              isImageFileName(file.fileName!) ? (
+                                <PublicDocumentPreviewButton
+                                  fileName={file.fileName!}
+                                  previewUrl={file.fileUrl}
+                                  onPreview={() =>
+                                    openFromUrl(label, file.fileName!, file.fileUrl)
+                                  }
+                                />
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       <p className="mt-2 text-[13px] text-text-muted italic">Not provided</p>

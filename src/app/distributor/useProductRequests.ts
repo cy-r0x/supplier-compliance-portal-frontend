@@ -126,8 +126,13 @@ export function useProductRequests(initialParams?: ListProductsParams) {
       id: string,
       fieldValues: Array<{ requirementId: string; value: string }>,
       files: Array<{ requirementId: string; file: File }>,
+      removedDocumentAnswerIds?: string[],
     ) => {
-      await submitProduct(id, { fieldValues, files });
+      await submitProduct(id, {
+        fieldValues,
+        files,
+        removedDocumentAnswerIds,
+      });
       await fetchRequests();
     },
     [fetchRequests],

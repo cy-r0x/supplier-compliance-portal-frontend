@@ -109,6 +109,7 @@ export async function deleteProduct(id: string): Promise<void> {
 export type SubmitProductInput = {
   fieldValues: Array<{ requirementId: string; value: string }>;
   files: Array<{ requirementId: string; file: File }>;
+  removedDocumentAnswerIds?: string[];
 };
 
 export async function submitProduct(
@@ -117,6 +118,12 @@ export async function submitProduct(
 ): Promise<void> {
   const form = new FormData();
   form.append("fieldValues", JSON.stringify(input.fieldValues));
+  if (input.removedDocumentAnswerIds?.length) {
+    form.append(
+      "removedDocumentAnswerIds",
+      JSON.stringify(input.removedDocumentAnswerIds),
+    );
+  }
   for (const entry of input.files) {
     form.append(`doc__${entry.requirementId}`, entry.file);
   }

@@ -235,104 +235,122 @@ export function TemplateFormModal({
             </div>
           ) : (
             <form
-              className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
+              className="flex min-h-0 flex-1 flex-col"
               onSubmit={handleSubmit}
               noValidate
             >
-              <label className="block text-[12px] font-medium text-text-primary">
-                Template name <span className="text-brand-600">*</span>
-              </label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="mt-1.5 h-11 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
-                placeholder="e.g. Default EU compliance"
-                autoFocus
-              />
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+                <label className="block text-[12px] font-medium text-text-primary">
+                  Template name <span className="text-brand-600">*</span>
+                </label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1.5 h-11 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
+                  placeholder="e.g. Default EU compliance"
+                  autoFocus
+                />
 
-              <section className="mt-6">
-                <h3 className="text-[14px] font-medium text-text-primary">Documents</h3>
-                <div className="mt-3 space-y-3">
-                  {documents.map((row) => (
-                    <div
-                      key={row.key}
-                      className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <p className="text-[13px] font-medium text-text-primary">{row.label}</p>
-                      <RequirementToggles
-                        required={row.required}
-                        isPublic={row.isPublic}
-                        onRequiredChange={(required) =>
-                          setDocuments((prev) =>
-                            prev.map((item) =>
-                              item.key === row.key ? { ...item, required } : item,
-                            ),
-                          )
-                        }
-                        onPublicChange={(isPublic) =>
-                          setDocuments((prev) =>
-                            prev.map((item) =>
-                              item.key === row.key ? { ...item, isPublic } : item,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
+                <section className="mt-6">
+                  <h3 className="text-[14px] font-medium text-text-primary">
+                    Documents
+                  </h3>
+                  <div className="mt-3 space-y-3">
+                    {documents.map((row) => (
+                      <div
+                        key={row.key}
+                        className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <p className="text-[13px] font-medium text-text-primary">
+                          {row.label}
+                        </p>
+                        <RequirementToggles
+                          required={row.required}
+                          isPublic={row.isPublic}
+                          onRequiredChange={(required) =>
+                            setDocuments((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, required }
+                                  : item,
+                              ),
+                            )
+                          }
+                          onPublicChange={(isPublic) =>
+                            setDocuments((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, isPublic }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
-              <section className="mt-6">
-                <h3 className="text-[14px] font-medium text-text-primary">Fields</h3>
-                <div className="mt-3 space-y-3">
-                  {textFields.map((row) => (
-                    <div
-                      key={row.key}
-                      className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <p className="text-[13px] font-medium text-text-primary">{row.label}</p>
-                      <RequirementToggles
-                        required={row.required}
-                        isPublic={row.isPublic}
-                        onRequiredChange={(required) =>
-                          setTextFields((prev) =>
-                            prev.map((item) =>
-                              item.key === row.key ? { ...item, required } : item,
-                            ),
-                          )
-                        }
-                        onPublicChange={(isPublic) =>
-                          setTextFields((prev) =>
-                            prev.map((item) =>
-                              item.key === row.key ? { ...item, isPublic } : item,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
+                <section className="mt-6 pb-2">
+                  <h3 className="text-[14px] font-medium text-text-primary">
+                    Fields
+                  </h3>
+                  <div className="mt-3 space-y-3">
+                    {textFields.map((row) => (
+                      <div
+                        key={row.key}
+                        className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <p className="text-[13px] font-medium text-text-primary">
+                          {row.label}
+                        </p>
+                        <RequirementToggles
+                          required={row.required}
+                          isPublic={row.isPublic}
+                          onRequiredChange={(required) =>
+                            setTextFields((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, required }
+                                  : item,
+                              ),
+                            )
+                          }
+                          onPublicChange={(isPublic) =>
+                            setTextFields((prev) =>
+                              prev.map((item) =>
+                                item.key === row.key
+                                  ? { ...item, isPublic }
+                                  : item,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
 
-              {error ? (
-                <p role="alert" className="mt-4 text-[13px] text-danger-500">
-                  {error}
-                </p>
-              ) : null}
+                {error ? (
+                  <p role="alert" className="mt-4 text-[13px] text-danger-500">
+                    {error}
+                  </p>
+                ) : null}
+              </div>
 
-              <div className="sticky bottom-0 mt-6 flex justify-end gap-2 border-t border-border-subtle bg-bg-elevated pt-4 pb-1">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-border-subtle bg-bg-elevated px-5 py-4">
                 <button
                   type="button"
                   onClick={onClose}
                   disabled={submitting || impactLoading}
-                  className="h-10 rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
+                  className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || impactLoading || loading}
-                  className="h-10 rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
+                  className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
                 >
                   {impactLoading
                     ? "Checking…"

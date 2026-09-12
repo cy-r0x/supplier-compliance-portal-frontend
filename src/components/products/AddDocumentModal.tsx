@@ -9,8 +9,9 @@ type AddDocumentModalProps = {
   options: ApiDocumentRequirement[];
   acceptByType: Record<string, string>;
   labelFor: (doc: ApiDocumentRequirement) => string;
+  initialRequirementId?: string;
   onClose: () => void;
-  onAdd: (requirementId: string, file: File) => void;
+  onAdd: (requirementId: string, files: File[]) => void;
 };
 
 export function AddDocumentModal({
@@ -18,19 +19,25 @@ export function AddDocumentModal({
   options,
   acceptByType,
   labelFor,
+  initialRequirementId,
   onClose,
   onAdd,
 }: AddDocumentModalProps) {
   const [requirementId, setRequirementId] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setRequirementId(options[0]?.id ?? "");
-    setFile(null);
+    const preferred =
+      (initialRequirementId &&
+        options.find((row) => row.id === initialRequirementId)?.id) ||
+      options[0]?.id ||
+      "";
+    setRequirementId(preferred);
+    setFiles([]);
     setError(null);
-  }, [open, options]);
+  }, [open, options, initialRequirementId]);
 
   useEffect(() => {
     if (!open) return;
@@ -54,11 +61,11 @@ export function AddDocumentModal({
       setError("Select a document type");
       return;
     }
-    if (!file) {
-      setError("Choose a file to upload");
+    if (files.length === 0) {
+      setError("Choose at least one file to upload");
       return;
     }
-    onAdd(requirementId, file);
+    onAdd(requirementId, files);
     onClose();
   }
 
@@ -88,7 +95,7 @@ export function AddDocumentModal({
               Add document
             </h2>
             <p className="mt-0.5 text-[12px] text-text-secondary">
-              Choose the document type, then upload the file.
+              Choose the document type, then upload one or more files.
             </p>
           </div>
           <button
@@ -103,7 +110,7 @@ export function AddDocumentModal({
         <form className="space-y-4 px-5 py-4" onSubmit={handleSubmit} noValidate>
           {options.length === 0 ? (
             <p className="text-[13px] text-text-secondary">
-              All available documents have already been added.
+              No document types are available for this request.
             </p>
           ) : (
             <>
@@ -119,7 +126,7 @@ export function AddDocumentModal({
                   value={requirementId}
                   onChange={(event) => {
                     setRequirementId(event.target.value);
-                    setFile(null);
+                    setFiles([]);
                     setError(null);
                   }}
                   className="mt-1.5 h-11 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
@@ -146,19 +153,33 @@ export function AddDocumentModal({
                   htmlFor="add-document-file"
                   className="block text-[12px] font-medium text-text-primary"
                 >
-                  File <span className="text-brand-600">*</span>
+                  Files <span className="text-brand-600">*</span>
                 </label>
                 <input
                   id="add-document-file"
                   key={requirementId}
                   type="file"
+                  multiple
                   accept={accept}
                   onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
+                    setFiles(Array.from(event.target.files ?? []));
                     setError(null);
                   }}
                   className="mt-1.5 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
                 />
+                {files.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-[12px] text-text-secondary">
+                    {files.map((file) => (
+                      <li key={`${file.name}-${file.size}-${file.lastModified}`}>
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1.5 text-[12px] text-text-muted">
+                    You can select multiple files for this type.
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -182,7 +203,7 @@ export function AddDocumentModal({
               disabled={options.length === 0}
               className="h-10 rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Add document
+              Add document{files.length > 1 ? "s" : ""}
             </button>
           </div>
         </form>

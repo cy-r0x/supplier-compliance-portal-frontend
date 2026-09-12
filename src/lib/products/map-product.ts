@@ -33,6 +33,12 @@ export type ApiProductListItem = {
   progress: ApiProductProgress;
 };
 
+export type ApiDocumentFile = {
+  id: string;
+  fileUrl: string;
+  fileName: string | null;
+};
+
 export type ApiDocumentRequirement = {
   id: string;
   type: string;
@@ -40,7 +46,7 @@ export type ApiDocumentRequirement = {
   label: string | null;
   level: "REQUIRED" | "OPTIONAL";
   visibility: "PUBLIC" | "PRIVATE";
-  document: { fileUrl: string; fileName: string | null } | null;
+  documents: ApiDocumentFile[];
 };
 
 export type ApiFieldRequirement = {

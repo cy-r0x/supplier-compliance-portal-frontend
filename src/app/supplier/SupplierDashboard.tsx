@@ -398,23 +398,13 @@ function ProductRequestsSection({
                         {formatDate(request.requestedAt)}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {request.apiStatus === "PENDING" ? (
-                          <button
-                            type="button"
-                            onClick={() => onEdit(request)}
-                            className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-                          >
-                            Edit
-                          </button>
-                        ) : (
-                          <span className="text-[12px] font-medium text-text-muted">
-                            {request.apiStatus === "SUBMITTED"
-                              ? "Awaiting review"
-                              : request.status === "approved"
-                                ? "Approved"
-                                : "Submitted"}
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onEdit(request)}
+                          className="cursor-pointer rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                        >
+                          {request.apiStatus === "PENDING" ? "Edit" : "View"}
+                        </button>
                       </td>
                     </tr>
                   ))}

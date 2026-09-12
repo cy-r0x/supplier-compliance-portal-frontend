@@ -216,11 +216,11 @@ export function rowsFromApiProduct(product: ApiProductDetail): {
       required: req ? req.level === "REQUIRED" : defaults.required,
       isPublic: req ? req.visibility === "PUBLIC" : defaults.isPublic,
       prefillFile: null,
-      ...(req?.document?.fileUrl && req.document.fileName
+      ...(req?.documents[0]?.fileUrl && req.documents[0].fileName
         ? {
             existingPrefill: {
-              fileName: req.document.fileName,
-              fileUrl: req.document.fileUrl,
+              fileName: req.documents[0].fileName,
+              fileUrl: req.documents[0].fileUrl,
             },
           }
         : {}),
