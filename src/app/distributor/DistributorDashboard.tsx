@@ -117,8 +117,13 @@ function EmptyState({
 
 type RequestStatusFilter = "all" | ProductRequestStatus | "submitted";
 
-function requestHref(request: ProductRequest): string {
-  if (request.apiStatus === "PENDING") {
+function requestHref(
+  request: ProductRequest,
+  options?: { canManage?: boolean },
+): string {
+  const canManage = options?.canManage ?? false;
+  // Members are read-only — always open the review/view page.
+  if (request.apiStatus === "PENDING" && canManage) {
     return `/products/${request.id}/edit`;
   }
   return `/products/${request.id}/review`;
@@ -407,7 +412,9 @@ function DistributorDashboardInner() {
             canManage={isManager}
             onViewRequests={() => navigate("products")}
             onViewNotifications={() => navigate("notifications")}
-            onOpenRequest={(request) => router.push(requestHref(request))}
+            onOpenRequest={(request) =>
+              router.push(requestHref(request, { canManage: isManager }))
+            }
           />
         ) : section === "suppliers" && isManager ? (
           <SuppliersSection suppliers={suppliers} />
@@ -1069,7 +1076,7 @@ function ProductRequestsSection({
   }
 
   function openRequest(request: ProductRequest) {
-    router.push(requestHref(request));
+    router.push(requestHref(request, { canManage }));
   }
 
   const filterOptions: { value: RequestStatusFilter; label: string; count: number }[] =

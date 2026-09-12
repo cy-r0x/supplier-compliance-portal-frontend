@@ -34,6 +34,7 @@ import {
   publicFieldLabel,
 } from "@/lib/public-product-labels";
 import { ProductReviewPageSkeleton } from "@/components/loading/page-skeletons";
+import { AccessDenied } from "@/components/AccessDenied";
 import { formatDate } from "@/app/admin/types";
 
 function RichTextContent({ html }: { html: string }) {
@@ -243,17 +244,9 @@ export default function ProductReviewPage() {
 
   if (!canReview) {
     return (
-      <div className="flex min-h-full flex-1 flex-col items-center justify-center bg-bg-app px-4 text-center">
-        <p className="text-[15px] font-medium text-text-primary">
-          Access denied
-        </p>
-        <Link
-          href="/dashboard"
-          className="mt-4 text-[13px] font-medium text-brand-600 hover:text-brand-700"
-        >
-          Back to dashboard
-        </Link>
-      </div>
+      <AccessDenied
+        description="Only organization managers can review product submissions. Open the dashboard to see requests you can access."
+      />
     );
   }
 

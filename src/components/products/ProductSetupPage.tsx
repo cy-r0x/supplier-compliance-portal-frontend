@@ -47,6 +47,7 @@ import {
 } from "@/lib/api/templates-api";
 import { CreateTemplateModal } from "@/components/products/CreateTemplateModal";
 import { TemplateSelect } from "@/components/products/TemplateSelect";
+import { AccessDenied } from "@/components/AccessDenied";
 
 type SetupSection = "details" | "documents" | "fields";
 
@@ -345,12 +346,9 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
 
   if (user.role !== "USER" || user.organization?.role !== "MANAGER") {
     return (
-      <div className="flex min-h-full flex-1 flex-col items-center justify-center bg-bg-app px-4 text-center">
-        <p className="text-[15px] font-medium text-text-primary">Access denied</p>
-        <Link href="/dashboard" className="mt-4 text-[13px] font-medium text-brand-600">
-          Back to dashboard
-        </Link>
-      </div>
+      <AccessDenied
+        description="Only organization managers can create or edit product requests. Members can view requests from the dashboard."
+      />
     );
   }
 
