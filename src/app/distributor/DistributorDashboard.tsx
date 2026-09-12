@@ -9,6 +9,7 @@ import {
   HiOutlineBolt,
   HiOutlineChevronRight,
   HiOutlineClipboardDocumentList,
+  HiOutlineDocumentDuplicate,
   HiOutlineEye,
   HiOutlineHome,
   HiOutlineMagnifyingGlass,
@@ -23,6 +24,7 @@ import { useNotifications } from "../../lib/useNotifications";
 import AppShell from "../../../components/layouts/AppShell";
 import NotificationsInbox from "../../../components/notifications/NotificationsInbox";
 import UserSettingsPage from "@/components/settings/UserSettingsPage";
+import { TemplatesSection } from "@/components/products/TemplatesSection";
 import { Skeleton, SkeletonRows } from "@/components/loading/Skeleton";
 import {
   AppWorkspaceSkeleton,
@@ -49,6 +51,11 @@ type SupplierModalState =
 const NAV_ITEMS = [
   { id: "dashboard" as const, label: "Dashboard", icon: HiOutlineHome },
   { id: "suppliers" as const, label: "Suppliers", icon: HiOutlineTruck },
+  {
+    id: "templates" as const,
+    label: "Templates",
+    icon: HiOutlineDocumentDuplicate,
+  },
   {
     id: "products" as const,
     label: "Product request",
@@ -432,6 +439,8 @@ function DistributorDashboardInner() {
             onEdit={openEditSupplier}
             onDelete={handleDeleteSupplier}
           />
+        ) : section === "templates" ? (
+          <TemplatesSection />
         ) : section === "products" ? (
           <ProductRequestsSection
             requests={requests}

@@ -1,6 +1,7 @@
 export type DistributorSection =
   | "dashboard"
   | "suppliers"
+  | "templates"
   | "products"
   | "notifications"
   | "settings";
@@ -8,6 +9,7 @@ export type DistributorSection =
 export const DISTRIBUTOR_SECTIONS: DistributorSection[] = [
   "dashboard",
   "suppliers",
+  "templates",
   "products",
   "notifications",
   "settings",
@@ -51,6 +53,7 @@ export type ProductRequestFormValues = {
   price?: number;
   photoFile?: File | null;
   supplierId: string;
+  templateId: string;
   status: ProductRequestStatus;
 };
 

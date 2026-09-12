@@ -22,6 +22,10 @@ import {
 import type { ApiProductDetail } from "@/lib/products/map-product";
 import { apiDetailToProductRequest } from "@/lib/products/map-product";
 import { isEmptyHtml } from "@/lib/html";
+import {
+  publicDocumentLabel,
+  publicFieldLabel,
+} from "@/lib/public-product-labels";
 import { ProductReviewPageSkeleton } from "@/components/loading/page-skeletons";
 
 function RichTextContent({ html }: { html: string }) {
@@ -227,7 +231,7 @@ export default function ProductReviewPage() {
             <h2 className="text-[15px] font-medium text-text-primary">Documents</h2>
             <div className="mt-4 space-y-4">
               {product.documentRequirements.map((doc) => {
-                const label = doc.label || doc.type;
+                const label = publicDocumentLabel(doc.type, doc.label);
                 const fileName = doc.document?.fileName ?? "";
                 const fileUrl = doc.document?.fileUrl;
                 return (
@@ -288,7 +292,7 @@ export default function ProductReviewPage() {
             <h2 className="text-[15px] font-medium text-text-primary">Product information</h2>
             <div className="mt-4 space-y-4">
               {product.fieldRequirements.map((field) => {
-                const label = field.label || field.fieldType;
+                const label = publicFieldLabel(field.fieldType, field.label);
                 const value = field.fieldValue?.value ?? "";
                 return (
                   <div

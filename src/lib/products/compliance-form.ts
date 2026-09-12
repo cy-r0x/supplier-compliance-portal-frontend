@@ -103,6 +103,79 @@ export function createEmptyTextRows(): TextFormRow[] {
   });
 }
 
+export function rowsFromTemplate(template: {
+  documents: Array<{
+    type: string;
+    customKey: string;
+    label: string | null;
+    level: "REQUIRED" | "OPTIONAL";
+    visibility: "PUBLIC" | "PRIVATE";
+  }>;
+  fields: Array<{
+    fieldType: string;
+    customKey: string;
+    label: string | null;
+    level: "REQUIRED" | "OPTIONAL";
+    visibility: "PUBLIC" | "PRIVATE";
+  }>;
+}): { documents: DocumentFormRow[]; textFields: TextFormRow[] } {
+  const documents = createEmptyDocumentRows().map((row) => {
+    const match =
+      row.key === "other"
+        ? template.documents.find((item) => item.type === "OTHER")
+        : template.documents.find((item) => item.type === row.type);
+    if (!match) return row;
+    return {
+      ...row,
+      required: match.level === "REQUIRED",
+      isPublic: match.visibility === "PUBLIC",
+      ...(match.label ? { label: match.label } : {}),
+      ...(match.customKey ? { customKey: match.customKey } : {}),
+    };
+  });
+
+  const textFields = createEmptyTextRows().map((row) => {
+    const match =
+      row.key === "additionalNotes"
+        ? template.fields.find((item) => item.fieldType === "ADDITIONAL_NOTES")
+        : template.fields.find((item) => item.fieldType === row.fieldType);
+    if (!match) return row;
+    return {
+      ...row,
+      required: match.level === "REQUIRED",
+      isPublic: match.visibility === "PUBLIC",
+      ...(match.label ? { label: match.label } : {}),
+      ...(match.customKey ? { customKey: match.customKey } : {}),
+    };
+  });
+
+  return { documents, textFields };
+}
+
+export function templatePayloadFromRows(
+  documents: DocumentFormRow[],
+  textFields: TextFormRow[],
+) {
+  return {
+    documents: documents.map((row) => ({
+      type: row.type,
+      ...(row.type === "OTHER"
+        ? { customKey: row.customKey ?? "other", label: row.label }
+        : {}),
+      level: (row.required ? "REQUIRED" : "OPTIONAL") as "REQUIRED" | "OPTIONAL",
+      visibility: (row.isPublic ? "PUBLIC" : "PRIVATE") as "PUBLIC" | "PRIVATE",
+    })),
+    fields: textFields.map((row) => ({
+      fieldType: row.fieldType,
+      ...(row.fieldType === "OTHER" || row.customKey
+        ? { customKey: row.customKey ?? "notes", label: row.label }
+        : {}),
+      level: (row.required ? "REQUIRED" : "OPTIONAL") as "REQUIRED" | "OPTIONAL",
+      visibility: (row.isPublic ? "PUBLIC" : "PRIVATE") as "PUBLIC" | "PRIVATE",
+    })),
+  };
+}
+
 function findDocumentRequirement(
   requirements: ApiDocumentRequirement[],
   key: keyof ComplianceDocuments,
@@ -195,6 +268,7 @@ function documentPrefillFieldName(type: string, customKey?: string): string {
 export type CreateProductComplianceInput = {
   name: string;
   supplierId: string;
+  templateId: string;
   sku?: string;
   price?: number;
   photo?: File | null;
@@ -208,6 +282,7 @@ export function buildCreateProductFormData(
   const form = new FormData();
   form.append("name", input.name.trim());
   form.append("supplierId", input.supplierId);
+  form.append("templateId", input.templateId);
   if (input.sku?.trim()) form.append("sku", input.sku.trim());
   if (input.price !== undefined && input.price !== null) {
     form.append("price", String(input.price));

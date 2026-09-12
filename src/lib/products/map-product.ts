@@ -57,6 +57,8 @@ export type ApiProductDetail = ApiProductListItem & {
   submittedAt: string | null;
   reviewedAt: string | null;
   rejectionReason: string | null;
+  templateId?: string | null;
+  template?: { id: string; name: string } | null;
   documentRequirements: ApiDocumentRequirement[];
   fieldRequirements: ApiFieldRequirement[];
 };

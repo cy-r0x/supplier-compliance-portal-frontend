@@ -26,10 +26,18 @@ import {
   createEmptyTextRows,
   parseOptionalPrice,
   rowsFromApiProduct,
+  rowsFromTemplate,
   type DocumentFormRow,
   type TextFormRow,
 } from "@/lib/products/compliance-form";
 import { isEmptyHtml } from "@/lib/html";
+import {
+  getTemplate,
+  listTemplates,
+  type ApiTemplateListItem,
+} from "@/lib/api/templates-api";
+import { CreateTemplateModal } from "@/components/products/CreateTemplateModal";
+import { TemplateSelect } from "@/components/products/TemplateSelect";
 
 type SetupSection = "details" | "documents" | "fields";
 
@@ -123,11 +131,17 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [documents, setDocuments] = useState<DocumentFormRow[]>(createEmptyDocumentRows);
   const [textFields, setTextFields] = useState<TextFormRow[]>(createEmptyTextRows);
+  const [templates, setTemplates] = useState<ApiTemplateListItem[]>([]);
+  const [templateId, setTemplateId] = useState("");
+  const [templateName, setTemplateName] = useState<string | null>(null);
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { preview, close, openFromFile, openFromUrl } = usePdfPreview();
 
+  const requirementsLocked = isEdit || Boolean(templateId);
   const preselectedSupplier = searchParams.get("supplierId");
 
   useEffect(() => {
@@ -147,6 +161,8 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
           setPrice(product.price != null ? String(product.price) : "");
           setSupplierId(product.supplier.id);
           setExistingPhotoUrl(product.photo);
+          setTemplateId(product.templateId ?? "");
+          setTemplateName(product.template?.name ?? null);
           const rows = rowsFromApiProduct(product);
           setDocuments(rows.documents);
           setTextFields(rows.textFields);
@@ -167,19 +183,53 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
     }
 
     setLoadingSuppliers(true);
-    listUsers({ role: "SUPPLIER", limit: 100, sort: "createdAt:desc" })
-      .then((result) => {
-        const items = result.items.map(apiUserToAdminEntity);
+    Promise.all([
+      listUsers({ role: "SUPPLIER", limit: 100, sort: "createdAt:desc" }),
+      listTemplates(),
+    ])
+      .then(([usersResult, templateItems]) => {
+        const items = usersResult.items.map(apiUserToAdminEntity);
         setSuppliers(items);
         const initial =
           preselectedSupplier && items.some((s) => s.id === preselectedSupplier)
             ? preselectedSupplier
             : items[0]?.id ?? "";
         setSupplierId(initial);
+        setTemplates(templateItems);
       })
-      .catch(() => setFormError("Failed to load suppliers"))
+      .catch(() => setFormError("Failed to load suppliers or templates"))
       .finally(() => setLoadingSuppliers(false));
   }, [user?.role, preselectedSupplier, isEdit, productId]);
+
+  async function applyTemplate(id: string) {
+    if (!id) {
+      setTemplateId("");
+      setTemplateName(null);
+      setDocuments(createEmptyDocumentRows());
+      setTextFields(createEmptyTextRows());
+      return;
+    }
+
+    setLoadingTemplate(true);
+    setFormError(null);
+    try {
+      const detail = await getTemplate(id);
+      const rows = rowsFromTemplate(detail);
+      setTemplateId(detail.id);
+      setTemplateName(detail.name);
+      setDocuments(rows.documents);
+      setTextFields(rows.textFields);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.templateId;
+        return next;
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to load template");
+    } finally {
+      setLoadingTemplate(false);
+    }
+  }
 
   useEffect(() => {
     if (!photoFile) {
@@ -281,6 +331,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Product name is required";
     if (!isEdit && !supplierId) next.supplierId = "Select a supplier";
+    if (!isEdit && !templateId) next.templateId = "Select a template";
     const parsedPrice = parseOptionalPrice(price);
     if (Number.isNaN(parsedPrice)) {
       next.price = "Enter a valid price";
@@ -315,6 +366,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
         await createProduct({
           name: name.trim(),
           supplierId,
+          templateId,
           sku: sku.trim() || undefined,
           price: parsedPrice,
           photo: photoFile,
@@ -408,6 +460,42 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
                 Basic product information sent to the supplier.
               </p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                {!isEdit ? (
+                  <div className="sm:col-span-2">
+                    <label
+                      htmlFor="requirement-template"
+                      className="block text-[12px] font-medium text-text-primary"
+                    >
+                      Requirement template <span className="text-brand-600">*</span>
+                    </label>
+                    <TemplateSelect
+                      id="requirement-template"
+                      value={templateId}
+                      templates={templates}
+                      disabled={loadingTemplate}
+                      invalid={Boolean(errors.templateId)}
+                      onChange={(id) => void applyTemplate(id)}
+                      onCreateNew={() => setCreateTemplateOpen(true)}
+                    />
+                    {errors.templateId ? (
+                      <p className="mt-1 text-[12px] text-danger-500">{errors.templateId}</p>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-text-muted">
+                        Requirements are locked to the selected template.
+                      </p>
+                    )}
+                  </div>
+                ) : templateName ? (
+                  <div className="sm:col-span-2">
+                    <label className="block text-[12px] font-medium text-text-primary">
+                      Requirement template
+                    </label>
+                    <p className="mt-1.5 rounded-[9px] border border-border-subtle bg-bg-app px-3 py-2.5 text-[13px] text-text-primary">
+                      {templateName}
+                      <span className="ml-2 text-[11px] text-text-muted">(locked)</span>
+                    </p>
+                  </div>
+                ) : null}
                 <div className="sm:col-span-2">
                   <label className="block text-[12px] font-medium text-text-primary">
                     Product name <span className="text-brand-600">*</span>
@@ -532,6 +620,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
                         <RequirementToggles
                           required={row.required}
                           isPublic={row.isPublic}
+                          disabled={requirementsLocked}
                           onRequiredChange={(v) => updateDocument(row.key, { required: v })}
                           onPublicChange={(v) => updateDocument(row.key, { isPublic: v })}
                         />
@@ -593,6 +682,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
                         <RequirementToggles
                           required={row.required}
                           isPublic={row.isPublic}
+                          disabled={requirementsLocked}
                           onRequiredChange={(v) => updateText(row.key, { required: v })}
                           onPublicChange={(v) => updateText(row.key, { isPublic: v })}
                         />
@@ -654,6 +744,26 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
       </div>
 
       {preview ? <PdfPreviewModal preview={preview} onClose={close} /> : null}
+
+      <CreateTemplateModal
+        open={createTemplateOpen}
+        onClose={() => setCreateTemplateOpen(false)}
+        onCreated={(created) => {
+          setTemplates((prev) => {
+            if (prev.some((item) => item.id === created.id)) return prev;
+            return [
+              {
+                id: created.id,
+                name: created.name,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              },
+              ...prev,
+            ];
+          });
+          void applyTemplate(created.id);
+        }}
+      />
     </div>
   );
 }

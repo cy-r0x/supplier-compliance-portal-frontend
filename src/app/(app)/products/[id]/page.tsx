@@ -20,6 +20,12 @@ import type {
 import { apiDetailToProductRequest } from "@/lib/products/map-product";
 import { useProductRequests } from "@/app/distributor/useProductRequests";
 import { ComplianceFormPageSkeleton } from "@/components/loading/page-skeletons";
+import { AddDocumentModal } from "@/components/products/AddDocumentModal";
+import {
+  publicDocumentLabel,
+  publicFieldLabel,
+} from "@/lib/public-product-labels";
+import { HiOutlinePlus, HiOutlineTrash } from "react-icons/hi2";
 
 const TYPE_TO_ACCEPT = Object.fromEntries(
   DOCUMENT_FIELD_CONFIG.map(({ key, accept }) => {
@@ -38,6 +44,41 @@ const TYPE_TO_ACCEPT = Object.fromEntries(
 );
 
 import { RequirementMeta } from "@/components/products/RequirementMeta";
+
+function RequiredItemsSign({
+  title,
+  items,
+}: {
+  title: string;
+  items: string[];
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <aside
+      aria-label={title}
+      className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-3"
+    >
+      <p className="text-[12px] font-semibold tracking-wide text-amber-800 uppercase">
+        {title}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {items.map((item) => (
+          <li
+            key={item}
+            className="flex items-start gap-2 text-[12px] text-amber-900/90"
+          >
+            <span
+              className="mt-1.5 size-1.5 shrink-0 rounded-full bg-amber-400"
+              aria-hidden
+            />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </aside>
+  );
+}
 
 function SubmitSuccessTooltip({
   publicSlug,
@@ -120,6 +161,7 @@ export default function ProductCompliancePage() {
   const [submitting, setSubmitting] = useState(false);
   const [showSubmitTooltip, setShowSubmitTooltip] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const [addDocumentOpen, setAddDocumentOpen] = useState(false);
   const [productImagePreviewUrl, setProductImagePreviewUrl] = useState<
     string | null
   >(null);
@@ -235,11 +277,11 @@ export default function ProductCompliancePage() {
   }
 
   function docLabel(doc: ApiDocumentRequirement) {
-    return doc.label || doc.type;
+    return publicDocumentLabel(doc.type, doc.label);
   }
 
   function fieldLabel(field: ApiFieldRequirement) {
-    return field.label || field.fieldType;
+    return publicFieldLabel(field.fieldType, field.label);
   }
 
   function validate(): Record<string, string> {
@@ -344,75 +386,145 @@ export default function ProductCompliancePage() {
         <form key={formKey} className="mt-8" noValidate onSubmit={handleSubmit}>
           <div className="grid gap-8 lg:grid-cols-2">
             <section>
-              <h2 className="text-[15px] font-medium text-text-primary">Documents</h2>
-              <div className="mt-4 space-y-4">
-                {product.documentRequirements.map((doc) => {
-                  const invalid = errors[doc.id];
-                  const selectedFile = documentFiles[doc.id];
-                  const prefilled = prefilledDocs[doc.id];
-                  const fileName = selectedFile?.name ?? prefilled?.fileName ?? "";
-                  const previewUrl = selectedFile ? undefined : prefilled?.fileUrl;
-                  const accept = TYPE_TO_ACCEPT[doc.type] ?? ".pdf,.doc,.docx,.png,.jpg,.jpeg";
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-[15px] font-medium text-text-primary">
+                  Documents
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setAddDocumentOpen(true)}
+                  disabled={
+                    product.documentRequirements.every(
+                      (doc) => documentFiles[doc.id] || prefilledDocs[doc.id],
+                    )
+                  }
+                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[9px] bg-brand-500 px-3.5 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <HiOutlinePlus className="h-4 w-4" aria-hidden />
+                  Add document
+                </button>
+              </div>
+              <div className="mt-4">
+                <RequiredItemsSign
+                  title="Required documents"
+                  items={product.documentRequirements
+                    .filter((doc) => doc.level === "REQUIRED")
+                    .map((doc) => docLabel(doc))}
+                />
+
+                {(() => {
+                  const attachedDocs = product.documentRequirements.filter(
+                    (doc) => documentFiles[doc.id] || prefilledDocs[doc.id],
+                  );
+                  const missingRequired = product.documentRequirements.filter(
+                    (doc) =>
+                      doc.level === "REQUIRED" &&
+                      !documentFiles[doc.id] &&
+                      !prefilledDocs[doc.id] &&
+                      errors[doc.id],
+                  );
 
                   return (
-                    <div
-                      key={doc.id}
-                      className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <label
-                          htmlFor={`file-${doc.id}`}
-                          className="text-[13px] font-medium text-text-primary"
+                    <>
+                      {attachedDocs.length === 0 ? (
+                        <div className="rounded-[12px] border border-dashed border-border-subtle bg-bg-elevated px-4 py-8 text-center">
+                          <p className="text-[13px] font-medium text-text-primary">
+                            No documents added yet
+                          </p>
+                          <p className="mt-1 text-[12px] text-text-secondary">
+                            Use Add document to upload each file you need.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {attachedDocs.map((doc) => {
+                            const selectedFile = documentFiles[doc.id];
+                            const prefilled = prefilledDocs[doc.id];
+                            const fileName =
+                              selectedFile?.name ?? prefilled?.fileName ?? "";
+                            const previewUrl = selectedFile
+                              ? undefined
+                              : prefilled?.fileUrl;
+                            const isRequired = doc.level === "REQUIRED";
+
+                            return (
+                              <div
+                                key={doc.id}
+                                className={`rounded-[12px] border bg-bg-elevated p-4 ${
+                                  isRequired
+                                    ? "border-l-[3px] border-border-subtle border-l-amber-300"
+                                    : "border-border-subtle"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <p className="text-[13px] font-medium text-text-primary">
+                                      {docLabel(doc)}
+                                    </p>
+                                    <div className="mt-1.5">
+                                      <RequirementMeta
+                                        level={doc.level}
+                                        visibility={doc.visibility}
+                                      />
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDocumentFiles((prev) => {
+                                        const next = { ...prev };
+                                        delete next[doc.id];
+                                        return next;
+                                      });
+                                      setPrefilledDocs((prev) => {
+                                        const next = { ...prev };
+                                        delete next[doc.id];
+                                        return next;
+                                      });
+                                    }}
+                                    className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-[7px] px-2 text-[12px] font-medium text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-danger-500"
+                                    aria-label={`Remove ${docLabel(doc)}`}
+                                  >
+                                    <HiOutlineTrash className="h-4 w-4" aria-hidden />
+                                    Remove
+                                  </button>
+                                </div>
+                                {fileName ? (
+                                  <DocumentPreviewButton
+                                    fileName={fileName}
+                                    selectedFile={selectedFile}
+                                    previewUrl={previewUrl}
+                                    onPreview={() => {
+                                      if (selectedFile) {
+                                        openFromFile(docLabel(doc), selectedFile);
+                                      } else if (previewUrl) {
+                                        openFromUrl(
+                                          docLabel(doc),
+                                          fileName,
+                                          previewUrl,
+                                        );
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {missingRequired.length > 0 ? (
+                        <div
+                          role="alert"
+                          className="mt-3 rounded-[9px] border border-danger-500/30 bg-danger-50 px-3 py-2 text-[12px] text-danger-500"
                         >
-                          {docLabel(doc)}
-                        </label>
-                        <RequirementMeta level={doc.level} visibility={doc.visibility} />
-                      </div>
-                      <input
-                        id={`file-${doc.id}`}
-                        type="file"
-                        accept={accept}
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          if (file) {
-                            setDocumentFiles((prev) => ({ ...prev, [doc.id]: file }));
-                          } else {
-                            setDocumentFiles((prev) => {
-                              const next = { ...prev };
-                              delete next[doc.id];
-                              return next;
-                            });
-                          }
-                          setErrors((prev) => {
-                            const next = { ...prev };
-                            delete next[doc.id];
-                            return next;
-                          });
-                        }}
-                        className="mt-2 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
-                      />
-                      {fileName ? (
-                        <DocumentPreviewButton
-                          fileName={fileName}
-                          selectedFile={selectedFile}
-                          previewUrl={previewUrl}
-                          onPreview={() => {
-                            if (selectedFile) {
-                              openFromFile(docLabel(doc), selectedFile);
-                            } else if (previewUrl) {
-                              openFromUrl(docLabel(doc), fileName, previewUrl);
-                            }
-                          }}
-                        />
+                          Still required:{" "}
+                          {missingRequired.map((doc) => docLabel(doc)).join(", ")}
+                        </div>
                       ) : null}
-                      {invalid ? (
-                        <p role="alert" className="mt-2 text-[12px] text-danger-500">
-                          {invalid}
-                        </p>
-                      ) : null}
-                    </div>
+                    </>
                   );
-                })}
+                })()}
               </div>
             </section>
 
@@ -420,13 +532,25 @@ export default function ProductCompliancePage() {
               <h2 className="text-[15px] font-medium text-text-primary">
                 Product information
               </h2>
-              <div className="mt-4 space-y-4">
+              <div className="mt-4">
+                <RequiredItemsSign
+                  title="Required fields"
+                  items={product.fieldRequirements
+                    .filter((field) => field.level === "REQUIRED")
+                    .map((field) => fieldLabel(field))}
+                />
+                <div className="space-y-4">
                 {product.fieldRequirements.map((field) => {
                   const invalid = errors[field.id];
+                  const isRequired = field.level === "REQUIRED";
                   return (
                     <div
                       key={field.id}
-                      className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
+                      className={`rounded-[12px] border bg-bg-elevated p-4 ${
+                        isRequired
+                          ? "border-l-[3px] border-border-subtle border-l-amber-300"
+                          : "border-border-subtle"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <label
@@ -460,6 +584,7 @@ export default function ProductCompliancePage() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             </section>
           </div>
@@ -477,6 +602,24 @@ export default function ProductCompliancePage() {
       </div>
 
       {preview ? <PdfPreviewModal preview={preview} onClose={close} /> : null}
+
+      <AddDocumentModal
+        open={addDocumentOpen}
+        options={product.documentRequirements.filter(
+          (doc) => !documentFiles[doc.id] && !prefilledDocs[doc.id],
+        )}
+        acceptByType={TYPE_TO_ACCEPT}
+        labelFor={docLabel}
+        onClose={() => setAddDocumentOpen(false)}
+        onAdd={(requirementId, file) => {
+          setDocumentFiles((prev) => ({ ...prev, [requirementId]: file }));
+          setErrors((prev) => {
+            const next = { ...prev };
+            delete next[requirementId];
+            return next;
+          });
+        }}
+      />
     </div>
   );
 }

@@ -63,6 +63,7 @@ export function useProductRequests(initialParams?: ListProductsParams) {
       await createProduct({
         name: values.productName.trim(),
         supplierId: values.supplierId,
+        templateId: values.templateId,
         sku: values.sku?.trim(),
         price: values.price,
         photo: values.photoFile,
