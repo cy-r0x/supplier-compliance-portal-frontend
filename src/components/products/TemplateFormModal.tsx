@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { RequirementToggles } from "@/components/products/RequirementToggles";
 import {
   createEmptyDocumentRows,
@@ -34,10 +34,12 @@ export function TemplateFormModal({
   onClose,
   onSaved,
 }: TemplateFormModalProps) {
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const [documents, setDocuments] = useState<DocumentFormRow[]>(createEmptyDocumentRows);
   const [textFields, setTextFields] = useState<TextFormRow[]>(createEmptyTextRows);
   const [error, setError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [impactOpen, setImpactOpen] = useState(false);
@@ -60,6 +62,7 @@ export function TemplateFormModal({
     if (!open) return;
 
     setError(null);
+    setNameError(null);
     setSubmitting(false);
     setImpactOpen(false);
     setImpact(null);
@@ -117,6 +120,7 @@ export function TemplateFormModal({
   async function persist(action?: RelatedProductsAction) {
     setSubmitting(true);
     setError(null);
+    setNameError(null);
     try {
       const payload = templatePayloadFromRows(documents, textFields);
       if (mode === "create") {
@@ -144,7 +148,17 @@ export function TemplateFormModal({
       setImpactOpen(false);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save template");
+      const message =
+        err instanceof Error ? err.message : "Failed to save template";
+      setError(message);
+      if (/name/i.test(message)) {
+        setNameError(message);
+        nameInputRef.current?.focus();
+        nameInputRef.current?.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -153,9 +167,18 @@ export function TemplateFormModal({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) {
-      setError("Template name is required");
+      const message = "Template name is required";
+      setNameError(message);
+      setError(message);
+      nameInputRef.current?.focus();
+      nameInputRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
       return;
     }
+
+    setNameError(null);
 
     if (mode === "create") {
       await persist();
@@ -186,7 +209,9 @@ export function TemplateFormModal({
       }
       await persist();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to check related products");
+      setError(
+        err instanceof Error ? err.message : "Failed to check related products",
+      );
     } finally {
       setImpactLoading(false);
     }
@@ -205,7 +230,11 @@ export function TemplateFormModal({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label={mode === "create" ? "Create requirement template" : "Edit requirement template"}
+          aria-label={
+            mode === "create"
+              ? "Create requirement template"
+              : "Edit requirement template"
+          }
           className="flex max-h-[min(90vh,800px)] w-full max-w-3xl flex-col overflow-hidden rounded-[12px] border border-border-subtle bg-bg-elevated shadow-sm"
         >
           <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
@@ -240,16 +269,42 @@ export function TemplateFormModal({
               noValidate
             >
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                <label className="block text-[12px] font-medium text-text-primary">
+                <label
+                  htmlFor="template-name"
+                  className="block text-[12px] font-medium text-text-primary"
+                >
                   Template name <span className="text-brand-600">*</span>
                 </label>
                 <input
+                  ref={nameInputRef}
+                  id="template-name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1.5 h-11 w-full rounded-[9px] border border-border-subtle bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/25"
+                  aria-invalid={nameError ? true : undefined}
+                  aria-describedby={
+                    nameError ? "template-name-error" : undefined
+                  }
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (nameError) setNameError(null);
+                    if (error === "Template name is required") setError(null);
+                  }}
+                  className={`mt-1.5 h-11 w-full rounded-[9px] border bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:ring-2 ${
+                    nameError
+                      ? "border-danger-500 focus:border-danger-500 focus:ring-danger-500/20"
+                      : "border-border-subtle focus:border-focus-ring focus:ring-focus-ring/25"
+                  }`}
                   placeholder="e.g. Default EU compliance"
                   autoFocus
                 />
+                {nameError ? (
+                  <p
+                    id="template-name-error"
+                    role="alert"
+                    className="mt-1.5 text-[12px] text-danger-500"
+                  >
+                    {nameError}
+                  </p>
+                ) : null}
 
                 <section className="mt-6">
                   <h3 className="text-[14px] font-medium text-text-primary">
@@ -330,36 +385,37 @@ export function TemplateFormModal({
                     ))}
                   </div>
                 </section>
+              </div>
 
-                {error ? (
-                  <p role="alert" className="mt-4 text-[13px] text-danger-500">
+              <div className="shrink-0 border-t border-border-subtle bg-bg-elevated px-5 py-4">
+                {error && error !== nameError ? (
+                  <p role="alert" className="mb-3 text-[13px] text-danger-500">
                     {error}
                   </p>
                 ) : null}
-              </div>
-
-              <div className="flex shrink-0 justify-end gap-2 border-t border-border-subtle bg-bg-elevated px-5 py-4">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={submitting || impactLoading}
-                  className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || impactLoading || loading}
-                  className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
-                >
-                  {impactLoading
-                    ? "Checking…"
-                    : submitting
-                      ? "Saving…"
-                      : mode === "create"
-                        ? "Save template"
-                        : "Save changes"}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={submitting || impactLoading}
+                    className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting || impactLoading || loading}
+                    className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
+                  >
+                    {impactLoading
+                      ? "Checking…"
+                      : submitting
+                        ? "Saving…"
+                        : mode === "create"
+                          ? "Save template"
+                          : "Save changes"}
+                  </button>
+                </div>
               </div>
             </form>
           )}
@@ -447,7 +503,9 @@ export function TemplateFormModal({
                     key={product.id}
                     className="flex items-center justify-between gap-2 border-b border-border-subtle py-1.5 last:border-b-0"
                   >
-                    <span className="truncate text-text-primary">{product.name}</span>
+                    <span className="truncate text-text-primary">
+                      {product.name}
+                    </span>
                     <span className="shrink-0">
                       {product.supplierName} · {product.status}
                     </span>
