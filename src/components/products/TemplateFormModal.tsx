@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { HiOutlineDocumentText, HiOutlineXMark } from "react-icons/hi2";
 import { RequirementToggles } from "@/components/products/RequirementToggles";
 import {
   createEmptyDocumentRows,
@@ -27,6 +28,54 @@ type TemplateFormModalProps = {
   onSaved: (template: { id: string; name: string }) => void;
 };
 
+function countRequired(rows: Array<{ required: boolean }>): number {
+  return rows.filter((row) => row.required).length;
+}
+
+function RequirementRow({
+  label,
+  required,
+  isPublic,
+  disabled,
+  onRequiredChange,
+  onPublicChange,
+}: {
+  label: string;
+  required: boolean;
+  isPublic: boolean;
+  disabled?: boolean;
+  onRequiredChange: (checked: boolean) => void;
+  onPublicChange: (checked: boolean) => void;
+}) {
+  return (
+    <li className="flex flex-col gap-3 border-b border-border-subtle px-4 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <div className="min-w-0 flex items-start gap-2.5">
+        <span
+          className={`mt-1.5 size-1.5 shrink-0 rounded-full ${
+            required ? "bg-brand-500" : "bg-border-subtle"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="text-[13px] font-medium text-text-primary">{label}</p>
+          <p className="mt-0.5 text-[11px] text-text-muted">
+            {required ? "Required from supplier" : "Optional"}
+            {" · "}
+            {isPublic ? "Shown on public page" : "Internal only"}
+          </p>
+        </div>
+      </div>
+      <RequirementToggles
+        required={required}
+        isPublic={isPublic}
+        disabled={disabled}
+        onRequiredChange={onRequiredChange}
+        onPublicChange={onPublicChange}
+      />
+    </li>
+  );
+}
+
 export function TemplateFormModal({
   open,
   mode,
@@ -34,10 +83,18 @@ export function TemplateFormModal({
   onClose,
   onSaved,
 }: TemplateFormModalProps) {
+  const titleId = useId();
+  const nameFieldId = useId();
+  const nameErrorId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
   const [name, setName] = useState("");
-  const [documents, setDocuments] = useState<DocumentFormRow[]>(createEmptyDocumentRows);
-  const [textFields, setTextFields] = useState<TextFormRow[]>(createEmptyTextRows);
+  const [documents, setDocuments] =
+    useState<DocumentFormRow[]>(createEmptyDocumentRows);
+  const [textFields, setTextFields] =
+    useState<TextFormRow[]>(createEmptyTextRows);
   const [error, setError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -51,6 +108,9 @@ export function TemplateFormModal({
     string | null
   >(null);
 
+  const requiredDocs = useMemo(() => countRequired(documents), [documents]);
+  const requiredFields = useMemo(() => countRequired(textFields), [textFields]);
+
   function requirementsKey(
     docs: DocumentFormRow[],
     fields: TextFormRow[],
@@ -61,6 +121,7 @@ export function TemplateFormModal({
   useEffect(() => {
     if (!open) return;
 
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     setError(null);
     setNameError(null);
     setSubmitting(false);
@@ -69,15 +130,27 @@ export function TemplateFormModal({
     setPendingAction(null);
     setInitialRequirementsKey(null);
 
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     if (mode === "create") {
       setName("");
       setDocuments(createEmptyDocumentRows());
       setTextFields(createEmptyTextRows());
       setLoading(false);
-      return;
+      window.setTimeout(() => nameInputRef.current?.focus(), 0);
+      return () => {
+        document.body.style.overflow = previousOverflow;
+        previouslyFocusedRef.current?.focus?.();
+      };
     }
 
-    if (!templateId) return;
+    if (!templateId) {
+      return () => {
+        document.body.style.overflow = previousOverflow;
+        previouslyFocusedRef.current?.focus?.();
+      };
+    }
 
     let cancelled = false;
     setLoading(true);
@@ -91,10 +164,13 @@ export function TemplateFormModal({
         setInitialRequirementsKey(
           requirementsKey(rows.documents, rows.textFields),
         );
+        window.setTimeout(() => nameInputRef.current?.focus(), 0);
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load template");
+          setError(
+            err instanceof Error ? err.message : "Failed to load template",
+          );
         }
       })
       .finally(() => {
@@ -103,13 +179,18 @@ export function TemplateFormModal({
 
     return () => {
       cancelled = true;
+      document.body.style.overflow = previousOverflow;
+      previouslyFocusedRef.current?.focus?.();
     };
   }, [open, mode, templateId]);
 
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !submitting && !impactOpen) onClose();
+      if (event.key === "Escape" && !submitting && !impactOpen) {
+        event.preventDefault();
+        onClose();
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -153,11 +234,13 @@ export function TemplateFormModal({
       setError(message);
       if (/name/i.test(message)) {
         setNameError(message);
-        nameInputRef.current?.focus();
-        nameInputRef.current?.scrollIntoView({
-          block: "nearest",
-          behavior: "smooth",
-        });
+        window.setTimeout(() => {
+          nameInputRef.current?.focus();
+          nameInputRef.current?.scrollIntoView({
+            block: "nearest",
+            behavior: "smooth",
+          });
+        }, 0);
       }
     } finally {
       setSubmitting(false);
@@ -170,15 +253,18 @@ export function TemplateFormModal({
       const message = "Template name is required";
       setNameError(message);
       setError(message);
-      nameInputRef.current?.focus();
-      nameInputRef.current?.scrollIntoView({
-        block: "nearest",
-        behavior: "smooth",
-      });
+      window.setTimeout(() => {
+        nameInputRef.current?.focus();
+        nameInputRef.current?.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
+      }, 0);
       return;
     }
 
     setNameError(null);
+    setError(null);
 
     if (mode === "create") {
       await persist();
@@ -191,7 +277,6 @@ export function TemplateFormModal({
       initialRequirementsKey !== null &&
       requirementsKey(documents, textFields) !== initialRequirementsKey;
 
-    // Name-only edits don't affect product compliance — skip the impact popup.
     if (!requirementsChanged) {
       await persist();
       return;
@@ -220,46 +305,62 @@ export function TemplateFormModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/40 px-4 py-6"
+        className="fixed inset-0 z-50 flex items-end justify-center bg-text-primary/40 px-0 py-0 sm:items-center sm:px-4 sm:py-6"
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !submitting && !impactOpen) {
+          if (
+            event.target === event.currentTarget &&
+            !submitting &&
+            !impactOpen
+          ) {
             onClose();
           }
         }}
       >
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label={
-            mode === "create"
-              ? "Create requirement template"
-              : "Edit requirement template"
-          }
-          className="flex max-h-[min(90vh,800px)] w-full max-w-3xl flex-col overflow-hidden rounded-[12px] border border-border-subtle bg-bg-elevated shadow-sm"
+          aria-labelledby={titleId}
+          className="flex max-h-[min(100dvh,900px)] w-full max-w-3xl flex-col overflow-hidden rounded-t-[16px] border border-border-subtle bg-bg-elevated shadow-sm sm:max-h-[min(90vh,820px)] sm:rounded-[12px]"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
-            <div>
-              <h2 className="text-[16px] font-semibold text-text-primary">
-                {mode === "create" ? "Create template" : "Edit template"}
-              </h2>
-              <p className="mt-0.5 text-[12px] text-text-secondary">
-                {mode === "create"
-                  ? "Name the template and set required/optional and public/private for each item."
-                  : "Changes apply to every product using this template as the requirement source."}
-              </p>
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border-subtle px-5 py-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-[9px] bg-brand-100/70 text-brand-700">
+                  <HiOutlineDocumentText className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <h2
+                    id={titleId}
+                    className="font-display text-[16px] font-semibold tracking-[-0.02em] text-text-primary"
+                  >
+                    {mode === "create" ? "Create template" : "Edit template"}
+                  </h2>
+                  <p className="mt-0.5 text-[12px] text-text-secondary">
+                    {mode === "create"
+                      ? "Name the template, then set required and visibility for each item."
+                      : "Changes apply to every product using this template."}
+                  </p>
+                </div>
+              </div>
             </div>
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="rounded-[7px] px-3 py-1.5 text-[12px] font-medium text-text-secondary hover:bg-bg-muted hover:text-text-primary disabled:opacity-60"
+              aria-label="Close"
+              className="cursor-pointer rounded-[8px] p-2 text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Close
+              <HiOutlineXMark className="size-5" aria-hidden />
             </button>
           </div>
 
           {loading ? (
-            <div className="px-5 py-10 text-center text-[13px] text-text-secondary">
+            <div
+              className="px-5 py-14 text-center text-[13px] text-text-secondary"
+              role="status"
+              aria-live="polite"
+            >
               Loading template…
             </div>
           ) : (
@@ -268,60 +369,84 @@ export function TemplateFormModal({
               onSubmit={handleSubmit}
               noValidate
             >
-              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-                <label
-                  htmlFor="template-name"
-                  className="block text-[12px] font-medium text-text-primary"
-                >
-                  Template name <span className="text-brand-600">*</span>
-                </label>
-                <input
-                  ref={nameInputRef}
-                  id="template-name"
-                  value={name}
-                  aria-invalid={nameError ? true : undefined}
-                  aria-describedby={
-                    nameError ? "template-name-error" : undefined
-                  }
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (nameError) setNameError(null);
-                    if (error === "Template name is required") setError(null);
-                  }}
-                  className={`mt-1.5 h-11 w-full rounded-[9px] border bg-bg-elevated px-3 text-[13px] text-text-primary outline-none focus:ring-2 ${
-                    nameError
-                      ? "border-danger-500 focus:border-danger-500 focus:ring-danger-500/20"
-                      : "border-border-subtle focus:border-focus-ring focus:ring-focus-ring/25"
-                  }`}
-                  placeholder="e.g. Default EU compliance"
-                  autoFocus
-                />
-                {nameError ? (
-                  <p
-                    id="template-name-error"
-                    role="alert"
-                    className="mt-1.5 text-[12px] text-danger-500"
-                  >
-                    {nameError}
-                  </p>
-                ) : null}
-
-                <section className="mt-6">
-                  <h3 className="text-[14px] font-medium text-text-primary">
-                    Documents
-                  </h3>
-                  <div className="mt-3 space-y-3">
-                    {documents.map((row) => (
-                      <div
-                        key={row.key}
-                        className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="sticky top-0 z-10 border-b border-border-subtle bg-bg-elevated px-5 py-4">
+                  <div>
+                    <label
+                      htmlFor={nameFieldId}
+                      className="block text-[12px] font-medium text-text-primary"
+                    >
+                      Template name{" "}
+                      <span className="text-brand-600" aria-hidden="true">
+                        *
+                      </span>
+                      <span className="sr-only">(required)</span>
+                    </label>
+                    <input
+                      ref={nameInputRef}
+                      id={nameFieldId}
+                      value={name}
+                      aria-invalid={nameError ? true : undefined}
+                      aria-describedby={
+                        nameError ? nameErrorId : undefined
+                      }
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (nameError) setNameError(null);
+                        if (error === "Template name is required") {
+                          setError(null);
+                        }
+                      }}
+                      className={`mt-1.5 h-11 w-full rounded-[9px] border bg-bg-app px-3 text-[13px] text-text-primary outline-none transition-[border-color,box-shadow] duration-150 focus:ring-2 ${
+                        nameError
+                          ? "border-danger-500 focus:border-danger-500 focus:ring-danger-500/20"
+                          : "border-border-subtle focus:border-focus-ring focus:ring-focus-ring/25"
+                      }`}
+                      placeholder="e.g. Default EU compliance"
+                      autoComplete="off"
+                    />
+                    {nameError ? (
+                      <p
+                        id={nameErrorId}
+                        role="alert"
+                        className="mt-1.5 text-[12px] text-danger-500"
                       >
-                        <p className="text-[13px] font-medium text-text-primary">
-                          {row.label}
+                        {nameError}
+                      </p>
+                    ) : (
+                      <p className="mt-1.5 text-[11px] text-text-muted">
+                        Used when assigning this template to product requests.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-5 px-5 py-5">
+                  <section aria-labelledby="template-docs-heading">
+                    <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <h3
+                          id="template-docs-heading"
+                          className="text-[14px] font-medium text-text-primary"
+                        >
+                          Documents
+                        </h3>
+                        <p className="mt-0.5 text-[12px] text-text-muted">
+                          Files suppliers upload for each product.
                         </p>
-                        <RequirementToggles
+                      </div>
+                      <p className="rounded-[7px] bg-bg-muted px-2 py-1 font-mono text-[11px] text-text-secondary">
+                        {requiredDocs}/{documents.length} required
+                      </p>
+                    </div>
+                    <ul className="overflow-hidden rounded-[10px] border border-border-subtle bg-bg-app">
+                      {documents.map((row) => (
+                        <RequirementRow
+                          key={row.key}
+                          label={row.label}
                           required={row.required}
                           isPublic={row.isPublic}
+                          disabled={submitting}
                           onRequiredChange={(required) =>
                             setDocuments((prev) =>
                               prev.map((item) =>
@@ -341,27 +466,35 @@ export function TemplateFormModal({
                             )
                           }
                         />
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                      ))}
+                    </ul>
+                  </section>
 
-                <section className="mt-6 pb-2">
-                  <h3 className="text-[14px] font-medium text-text-primary">
-                    Fields
-                  </h3>
-                  <div className="mt-3 space-y-3">
-                    {textFields.map((row) => (
-                      <div
-                        key={row.key}
-                        className="flex flex-col gap-3 rounded-[10px] border border-border-subtle bg-bg-app px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <p className="text-[13px] font-medium text-text-primary">
-                          {row.label}
+                  <section aria-labelledby="template-fields-heading">
+                    <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+                      <div>
+                        <h3
+                          id="template-fields-heading"
+                          className="text-[14px] font-medium text-text-primary"
+                        >
+                          Fields
+                        </h3>
+                        <p className="mt-0.5 text-[12px] text-text-muted">
+                          Text answers suppliers provide with the submission.
                         </p>
-                        <RequirementToggles
+                      </div>
+                      <p className="rounded-[7px] bg-bg-muted px-2 py-1 font-mono text-[11px] text-text-secondary">
+                        {requiredFields}/{textFields.length} required
+                      </p>
+                    </div>
+                    <ul className="overflow-hidden rounded-[10px] border border-border-subtle bg-bg-app">
+                      {textFields.map((row) => (
+                        <RequirementRow
+                          key={row.key}
+                          label={row.label}
                           required={row.required}
                           isPublic={row.isPublic}
+                          disabled={submitting}
                           onRequiredChange={(required) =>
                             setTextFields((prev) =>
                               prev.map((item) =>
@@ -381,10 +514,10 @@ export function TemplateFormModal({
                             )
                           }
                         />
-                      </div>
-                    ))}
-                  </div>
-                </section>
+                      ))}
+                    </ul>
+                  </section>
+                </div>
               </div>
 
               <div className="shrink-0 border-t border-border-subtle bg-bg-elevated px-5 py-4">
@@ -393,28 +526,37 @@ export function TemplateFormModal({
                     {error}
                   </p>
                 ) : null}
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={submitting || impactLoading}
-                    className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting || impactLoading || loading}
-                    className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
-                  >
-                    {impactLoading
-                      ? "Checking…"
-                      : submitting
-                        ? "Saving…"
-                        : mode === "create"
-                          ? "Save template"
-                          : "Save changes"}
-                  </button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-[12px] text-text-muted">
+                    {requiredDocs} required document
+                    {requiredDocs === 1 ? "" : "s"}
+                    {" · "}
+                    {requiredFields} required field
+                    {requiredFields === 1 ? "" : "s"}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      disabled={submitting || impactLoading}
+                      className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting || impactLoading || loading}
+                      className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {impactLoading
+                        ? "Checking…"
+                        : submitting
+                          ? "Saving…"
+                          : mode === "create"
+                            ? "Save template"
+                            : "Save changes"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </form>
@@ -424,7 +566,7 @@ export function TemplateFormModal({
 
       {impactOpen && impact ? (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-text-primary/50 px-4 py-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-text-primary/50 px-4 py-6"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget && !submitting) {
               setImpactOpen(false);
@@ -439,7 +581,7 @@ export function TemplateFormModal({
           >
             <h3
               id="template-impact-title"
-              className="text-[16px] font-semibold text-text-primary"
+              className="font-display text-[16px] font-semibold tracking-[-0.02em] text-text-primary"
             >
               Related products
             </h3>
@@ -458,7 +600,7 @@ export function TemplateFormModal({
 
             <fieldset className="mt-4 space-y-2">
               <legend className="sr-only">Related products action</legend>
-              <label className="flex cursor-pointer gap-3 rounded-[10px] border border-border-subtle p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+              <label className="flex cursor-pointer gap-3 rounded-[10px] border border-border-subtle p-3 transition-colors duration-150 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                 <input
                   type="radio"
                   name="related-products-action"
@@ -476,7 +618,7 @@ export function TemplateFormModal({
                   </span>
                 </span>
               </label>
-              <label className="flex cursor-pointer gap-3 rounded-[10px] border border-border-subtle p-3 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+              <label className="flex cursor-pointer gap-3 rounded-[10px] border border-border-subtle p-3 transition-colors duration-150 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                 <input
                   type="radio"
                   name="related-products-action"
@@ -524,7 +666,7 @@ export function TemplateFormModal({
                 type="button"
                 disabled={submitting}
                 onClick={() => setImpactOpen(false)}
-                className="h-10 rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary hover:bg-bg-muted disabled:opacity-60"
+                className="h-10 cursor-pointer rounded-[9px] border border-border-subtle px-4 text-[13px] font-medium text-text-secondary transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
               >
                 Back
               </button>
@@ -532,7 +674,7 @@ export function TemplateFormModal({
                 type="button"
                 disabled={submitting || !pendingAction}
                 onClick={() => void persist(pendingAction ?? undefined)}
-                className="h-10 rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse hover:bg-brand-600 disabled:opacity-60"
+                className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60"
               >
                 {submitting ? "Saving…" : "Confirm & save"}
               </button>

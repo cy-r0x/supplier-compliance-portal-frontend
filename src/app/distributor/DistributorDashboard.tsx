@@ -30,8 +30,7 @@ import {
   AppWorkspaceSkeleton,
   PageHeaderSkeleton,
 } from "@/components/loading/page-skeletons";
-import EntityFormModal from "../admin/EntityFormModal";
-import type { AdminEntity, EntityFormValues } from "../admin/types";
+import type { AdminEntity } from "../admin/types";
 import { formatDate } from "../admin/types";
 import { useAdminEntities } from "../admin/useAdminEntities";
 import ProductQrCode from "./ProductQrCode";
@@ -52,11 +51,6 @@ import {
   type OrganizationMemberRole,
 } from "@/lib/api/organizations-api";
 import { listUsers, type ApiUser } from "@/lib/api/users-api";
-
-type SupplierModalState =
-  | { open: false }
-  | { open: true; mode: "create" }
-  | { open: true; mode: "edit"; entity: AdminEntity };
 
 const NAV_ITEMS = [
   { id: "dashboard" as const, label: "Dashboard", icon: HiOutlineHome },
@@ -313,8 +307,6 @@ function DistributorDashboardInner() {
   const {
     ready: entitiesReady,
     suppliers,
-    addEntity,
-    updateEntity,
   } = useAdminEntities({ roleFilter: "SUPPLIER" });
 
   const {
@@ -346,9 +338,6 @@ function DistributorDashboardInner() {
       ? sectionParam
       : "dashboard";
 
-  const [supplierModal, setSupplierModal] = useState<SupplierModalState>({
-    open: false,
-  });
   const [actionError, setActionError] = useState<string | null>(null);
 
   const navigate = useCallback(
@@ -365,41 +354,6 @@ function DistributorDashboardInner() {
     },
     [router, searchParams],
   );
-
-  function openCreateSupplier() {
-    setSupplierModal({ open: true, mode: "create" });
-  }
-
-  function openEditSupplier(entity: AdminEntity) {
-    setSupplierModal({ open: true, mode: "edit", entity });
-  }
-
-  async function handleSupplierSubmit(values: EntityFormValues) {
-    if (!supplierModal.open) return;
-    setActionError(null);
-    try {
-      if (supplierModal.mode === "create") {
-        await addEntity("supplier", values);
-        setSupplierModal({ open: false });
-        return;
-      }
-      await updateEntity(
-        supplierModal.entity.id,
-        {
-          ...values,
-          password: values.password.trim() || supplierModal.entity.password,
-        },
-        "supplier",
-      );
-      setSupplierModal({ open: false });
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to save supplier");
-    }
-  }
-
-  function handleDeleteSupplier(_entity: AdminEntity) {
-    setActionError("Supplier delete is not available yet");
-  }
 
   function openCreateRequest() {
     router.push("/products/new");
@@ -450,19 +404,13 @@ function DistributorDashboardInner() {
             supplierCount={suppliers.length}
             unreadCount={unreadCount}
             onCreateRequest={openCreateRequest}
-            onCreateSupplier={openCreateSupplier}
             canManage={isManager}
             onViewRequests={() => navigate("products")}
             onViewNotifications={() => navigate("notifications")}
             onOpenRequest={(request) => router.push(requestHref(request))}
           />
         ) : section === "suppliers" && isManager ? (
-          <SuppliersSection
-            suppliers={suppliers}
-            onCreate={openCreateSupplier}
-            onEdit={openEditSupplier}
-            onDelete={handleDeleteSupplier}
-          />
+          <SuppliersSection suppliers={suppliers} />
         ) : section === "templates" && isManager ? (
           <TemplatesSection />
         ) : section === "team" && isManager && user?.organization ? (
@@ -476,7 +424,6 @@ function DistributorDashboardInner() {
             onEdit={openEditRequest}
             onDelete={handleDeleteRequest}
             onView={openViewSubmission}
-            onCreateSupplier={openCreateSupplier}
             onOpenSettings={() => navigate("settings")}
             canManage={isManager}
           />
@@ -497,20 +444,6 @@ function DistributorDashboardInner() {
           <UserSettingsPage />
         )}
       </AppShell>
-
-      <EntityFormModal
-        open={supplierModal.open}
-        mode={supplierModal.open ? supplierModal.mode : "create"}
-        entityType="supplier"
-        fixedRole="supplier"
-        initial={
-          supplierModal.open && supplierModal.mode === "edit"
-            ? supplierModal.entity
-            : null
-        }
-        onClose={() => setSupplierModal({ open: false })}
-        onSubmit={handleSupplierSubmit}
-      />
     </div>
   );
 }
@@ -601,7 +534,6 @@ function DashboardSection({
   supplierCount,
   unreadCount,
   onCreateRequest,
-  onCreateSupplier,
   onViewRequests,
   onViewNotifications,
   onOpenRequest,
@@ -613,7 +545,6 @@ function DashboardSection({
   supplierCount: number;
   unreadCount: number;
   onCreateRequest: () => void;
-  onCreateSupplier: () => void;
   onViewRequests: () => void;
   onViewNotifications: () => void;
   onOpenRequest: (request: ProductRequest) => void;
@@ -674,17 +605,8 @@ function DashboardSection({
 
       {hasNoSuppliers && canManage ? (
         <EmptyState
-          title="Add your first supplier"
-          description="Create a supplier account before sending product compliance requests."
-          action={
-            <button
-              type="button"
-              onClick={onCreateSupplier}
-              className="h-9 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600"
-            >
-              Create new supplier
-            </button>
-          }
+          title="No suppliers available"
+          description="Ask a platform admin to create supplier accounts before you send product compliance requests."
         />
       ) : hasNoRequests ? (
         <EmptyState
@@ -787,14 +709,8 @@ function DashboardSection({
 
 function SuppliersSection({
   suppliers,
-  onCreate,
-  onEdit,
-  onDelete,
 }: {
   suppliers: AdminEntity[];
-  onCreate: () => void;
-  onEdit: (entity: AdminEntity) => void;
-  onDelete: (entity: AdminEntity) => void;
 }) {
   const [search, setSearch] = useState("");
 
@@ -812,16 +728,7 @@ function SuppliersSection({
     <div>
       <PageHeader
         title="Suppliers"
-        description={`${suppliers.length} supplier${suppliers.length === 1 ? "" : "s"}`}
-        action={
-          <button
-            type="button"
-            onClick={onCreate}
-            className="h-10 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
-          >
-            Create new supplier
-          </button>
-        }
+        description={`${suppliers.length} supplier${suppliers.length === 1 ? "" : "s"} available for product requests. Accounts are managed by platform admins.`}
       />
 
       <div className="mb-4">
@@ -843,19 +750,8 @@ function SuppliersSection({
           title={suppliers.length === 0 ? "No suppliers yet" : "No matching suppliers"}
           description={
             suppliers.length === 0
-              ? "Create a supplier to start building your network."
+              ? "Ask a platform admin to create suppliers. Once available, you can assign them to product requests."
               : "Try a different search."
-          }
-          action={
-            suppliers.length === 0 ? (
-              <button
-                type="button"
-                onClick={onCreate}
-                className="h-9 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600"
-              >
-                Create new supplier
-              </button>
-            ) : undefined
           }
         />
       ) : (
@@ -866,9 +762,6 @@ function SuppliersSection({
                 <th className="px-4 py-2.5 font-medium">Name</th>
                 <th className="px-4 py-2.5 font-medium">Email</th>
                 <th className="px-4 py-2.5 font-medium">Created</th>
-                <th className="px-4 py-2.5 font-medium">
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
@@ -882,17 +775,6 @@ function SuppliersSection({
                   </td>
                   <td className="px-4 py-2 font-mono text-[12px] text-text-muted">
                     {formatDate(supplier.createdAt)}
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(supplier)}
-                      disabled
-                      title="Supplier edit is not available yet"
-                      className="cursor-not-allowed rounded-[7px] px-2.5 py-1.5 text-[12px] font-medium text-text-muted opacity-60"
-                    >
-                      Edit
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -1112,7 +994,6 @@ function ProductRequestsSection({
   onEdit,
   onDelete,
   onView,
-  onCreateSupplier,
   onOpenSettings,
   canManage,
 }: {
@@ -1123,7 +1004,6 @@ function ProductRequestsSection({
   onEdit: (request: ProductRequest) => void;
   onDelete: (request: ProductRequest) => void;
   onView: (request: ProductRequest) => void;
-  onCreateSupplier: () => void;
   onOpenSettings: () => void;
   canManage: boolean;
 }) {
@@ -1251,17 +1131,8 @@ function ProductRequestsSection({
 
       {supplierCount === 0 && canManage ? (
         <EmptyState
-          title="Add a supplier first"
-          description="You need at least one supplier before creating a product request."
-          action={canManage ? (
-            <button
-              type="button"
-              onClick={onCreateSupplier}
-              className="h-9 cursor-pointer rounded-[9px] bg-brand-500 px-4 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600"
-            >
-              Create new supplier
-            </button>
-          ) : undefined}
+          title="No suppliers available"
+          description="Ask a platform admin to create suppliers before you can start a product request."
         />
       ) : requests.length === 0 ? (
         <EmptyState

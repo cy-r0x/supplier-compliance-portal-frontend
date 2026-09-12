@@ -3,14 +3,23 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  HiOutlineArrowUpTray,
+  HiOutlineDocumentText,
+  HiOutlinePlus,
+  HiOutlineTrash,
+} from "react-icons/hi2";
 import TiptapEditor from "../../../components/editor/TiptapEditor";
 import {
   DocumentPreviewButton,
   PdfPreviewModal,
   usePdfPreview,
 } from "../../../components/documents/pdf-preview";
+import { AddDocumentModal } from "@/components/products/AddDocumentModal";
+import { RequirementMeta } from "@/components/products/RequirementMeta";
 import { RequirementToggles } from "@/components/products/RequirementToggles";
 import ProductThumbnail from "@/components/products/ProductThumbnail";
+import type { ApiDocumentRequirement } from "@/lib/products/map-product";
 import { ProductFormPageSkeleton } from "@/components/loading/page-skeletons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { listUsers } from "@/lib/api/users-api";
@@ -136,6 +145,10 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
   const [templateName, setTemplateName] = useState<string | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
+  const [addDocumentOpen, setAddDocumentOpen] = useState(false);
+  const [addDocumentKey, setAddDocumentKey] = useState<
+    DocumentFormRow["key"] | undefined
+  >(undefined);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -249,18 +262,74 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
   const requirementStats = useMemo(() => {
     const requiredDocs = documents.filter((row) => row.required).length;
     const prefilledDocs = documents.filter(
-      (row) => row.prefillFile || row.existingPrefill,
+      (row) =>
+        row.prefillFiles.length > 0 || row.existingPrefills.length > 0,
     ).length;
+    const prefilledFileCount = documents.reduce(
+      (sum, row) =>
+        sum + row.prefillFiles.length + row.existingPrefills.length,
+      0,
+    );
     const requiredFields = textFields.filter((row) => row.required).length;
     const prefilledFields = textFields.filter((row) => !isEmptyHtml(row.value)).length;
 
     return {
       requiredDocs,
       prefilledDocs,
+      prefilledFileCount,
       requiredFields,
       prefilledFields,
     };
   }, [documents, textFields]);
+
+  const attachedPrefillDocs = useMemo(
+    () =>
+      documents.filter(
+        (row) =>
+          row.prefillFiles.length > 0 || row.existingPrefills.length > 0,
+      ),
+    [documents],
+  );
+
+  const addDocumentOptions = useMemo<ApiDocumentRequirement[]>(
+    () =>
+      documents.map((row) => ({
+        id: row.key,
+        type: row.type,
+        customKey: row.customKey ?? "",
+        label: row.label,
+        level: row.required ? "REQUIRED" : "OPTIONAL",
+        visibility: row.isPublic ? "PUBLIC" : "PRIVATE",
+        documents: [],
+      })),
+    [documents],
+  );
+
+  const acceptByType = useMemo(
+    () =>
+      Object.fromEntries(documents.map((row) => [row.type, row.accept])),
+    [documents],
+  );
+
+  function addPrefillFiles(key: DocumentFormRow["key"], files: File[]) {
+    if (files.length === 0) return;
+    setDocuments((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const pending = files.map((file) => ({
+          localId: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+          file,
+        }));
+        return {
+          ...row,
+          prefillFiles: [...row.prefillFiles, ...pending],
+        };
+      }),
+    );
+    if (key === "productImage" && files[0]) {
+      setPhotoFile(files[0]);
+    }
+  }
 
   const displayPhoto = photoPreviewUrl ?? existingPhotoUrl;
 
@@ -550,7 +619,7 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
                       className={fieldClass(Boolean(errors.supplierId))}
                     >
                       {suppliers.length === 0 ? (
-                        <option value="">No suppliers yet</option>
+                        <option value="">No suppliers — ask an admin to create one</option>
                       ) : (
                         suppliers.map((s) => (
                           <option key={s.id} value={s.id}>{s.name}</option>
@@ -585,76 +654,191 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
             </section>
 
             <section id="setup-documents" className="scroll-mt-28">
-              <div className="mb-4">
-                <h2 className="text-[15px] font-medium text-text-primary">Documents</h2>
-                <p className="mt-1 text-[12px] text-text-secondary">
-                  Set required vs optional and public vs private. Upload a file to prefill for the
-                  supplier.
-                </p>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[15px] font-medium text-text-primary">Documents</h2>
+                  <p className="mt-1 text-[12px] text-text-secondary">
+                    Prefill files for the supplier. Add one or more files per document type.
+                    {attachedPrefillDocs.length > 0
+                      ? ` · ${requirementStats.prefilledFileCount} file${requirementStats.prefilledFileCount === 1 ? "" : "s"}`
+                      : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddDocumentKey(undefined);
+                    setAddDocumentOpen(true);
+                  }}
+                  disabled={!templateId && !isEdit}
+                  className="inline-flex h-10 min-w-[44px] cursor-pointer items-center gap-1.5 rounded-[9px] bg-brand-500 px-3.5 text-[13px] font-medium text-text-inverse transition-colors duration-150 hover:bg-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <HiOutlinePlus className="h-4 w-4" aria-hidden />
+                  Add document
+                </button>
               </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {documents.map((row) => {
-                  const displayFileName =
-                    row.prefillFile?.name ?? row.existingPrefill?.fileName ?? "";
-                  const previewUrl = row.prefillFile
-                    ? undefined
-                    : row.existingPrefill?.fileUrl;
-                  const hasPrefill = Boolean(displayFileName);
 
-                  return (
-                    <div
-                      key={row.key}
-                      className="rounded-[12px] border border-border-subtle bg-bg-elevated p-4"
-                    >
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-medium text-text-primary">{row.label}</p>
-                          {hasPrefill ? (
-                            <p className="mt-1 text-[11px] text-brand-700">
-                              Prefilled · {displayFileName}
-                            </p>
-                          ) : (
-                            <p className="mt-1 text-[11px] text-text-muted">No prefill yet</p>
-                          )}
+              {!templateId && !isEdit ? (
+                <div className="rounded-[12px] border border-dashed border-border-subtle bg-bg-elevated px-4 py-10 text-center">
+                  <p className="text-[13px] font-medium text-text-primary">
+                    Select a template first
+                  </p>
+                  <p className="mt-1 text-[12px] text-text-secondary">
+                    Document types come from the template. Then you can prefill files.
+                  </p>
+                </div>
+              ) : attachedPrefillDocs.length === 0 ? (
+                <div className="rounded-[12px] border border-dashed border-border-subtle bg-bg-elevated px-4 py-10 text-center">
+                  <span className="mx-auto flex size-11 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                    <HiOutlineArrowUpTray className="h-5 w-5" aria-hidden />
+                  </span>
+                  <p className="mt-3 text-[13px] font-medium text-text-primary">
+                    No prefill documents yet
+                  </p>
+                  <p className="mt-1 text-[12px] text-text-secondary">
+                    Optional — add files the supplier already provided so they do not re-upload them.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddDocumentKey(undefined);
+                      setAddDocumentOpen(true);
+                    }}
+                    className="mt-4 inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-border-subtle bg-bg-app px-4 text-[13px] font-medium text-text-primary transition-colors duration-150 hover:bg-bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                  >
+                    <HiOutlinePlus className="h-4 w-4" aria-hidden />
+                    Add your first document
+                  </button>
+                </div>
+              ) : (
+                <ul className="grid gap-4 lg:grid-cols-2">
+                  {attachedPrefillDocs.map((row) => {
+                    const count =
+                      row.existingPrefills.length + row.prefillFiles.length;
+                    return (
+                      <li
+                        key={row.key}
+                        className={`rounded-[12px] border bg-bg-elevated p-4 transition-colors duration-150 ${
+                          row.required
+                            ? "border-l-[3px] border-border-subtle border-l-amber-300"
+                            : "border-border-subtle"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="flex size-8 shrink-0 items-center justify-center rounded-[8px] bg-brand-100 text-brand-700"
+                                aria-hidden
+                              >
+                                <HiOutlineDocumentText className="h-4 w-4" />
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate text-[13px] font-medium text-text-primary">
+                                  {row.label}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-text-muted">
+                                  {count} file{count === 1 ? "" : "s"} prefilled
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <RequirementMeta
+                                level={row.required ? "REQUIRED" : "OPTIONAL"}
+                                visibility={row.isPublic ? "PUBLIC" : "PRIVATE"}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddDocumentKey(row.key);
+                              setAddDocumentOpen(true);
+                            }}
+                            className="inline-flex h-10 min-w-[44px] cursor-pointer items-center gap-1 rounded-[7px] px-2.5 text-[12px] font-medium text-brand-600 transition-colors duration-150 hover:bg-brand-100/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                          >
+                            <HiOutlinePlus className="h-4 w-4" aria-hidden />
+                            Add more
+                          </button>
                         </div>
-                        <RequirementToggles
-                          required={row.required}
-                          isPublic={row.isPublic}
-                          disabled={requirementsLocked}
-                          onRequiredChange={(v) => updateDocument(row.key, { required: v })}
-                          onPublicChange={(v) => updateDocument(row.key, { isPublic: v })}
-                        />
-                      </div>
-                      <input
-                        type="file"
-                        accept={row.accept}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] ?? null;
-                          updateDocument(row.key, { prefillFile: file });
-                          if (row.key === "productImage" && file) {
-                            setPhotoFile(file);
-                          }
-                        }}
-                        className="mt-3 block w-full text-[12px] text-text-secondary file:mr-3 file:cursor-pointer file:rounded-[7px] file:border-0 file:bg-brand-100 file:px-3 file:py-1.5 file:text-[12px] file:font-medium file:text-brand-700"
-                      />
-                      {hasPrefill ? (
-                        <DocumentPreviewButton
-                          fileName={displayFileName}
-                          selectedFile={row.prefillFile ?? undefined}
-                          previewUrl={previewUrl}
-                          onPreview={() => {
-                            if (row.prefillFile) {
-                              openFromFile(row.label, row.prefillFile);
-                            } else if (previewUrl) {
-                              openFromUrl(row.label, displayFileName, previewUrl);
-                            }
-                          }}
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
+
+                        <ul className="mt-3 space-y-3">
+                          {row.existingPrefills.map((file) => (
+                            <li
+                              key={file.id}
+                              className="rounded-[9px] border border-border-subtle bg-bg-app p-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <DocumentPreviewButton
+                                  fileName={file.fileName}
+                                  previewUrl={file.fileUrl}
+                                  onPreview={() =>
+                                    openFromUrl(
+                                      row.label,
+                                      file.fileName,
+                                      file.fileUrl,
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateDocument(row.key, {
+                                      existingPrefills: row.existingPrefills.filter(
+                                        (item) => item.id !== file.id,
+                                      ),
+                                      removedPrefillIds: [
+                                        ...row.removedPrefillIds,
+                                        file.id,
+                                      ],
+                                    })
+                                  }
+                                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-[7px] px-2 text-[12px] font-medium text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-danger-500"
+                                  aria-label={`Remove ${file.fileName}`}
+                                >
+                                  <HiOutlineTrash className="h-4 w-4" aria-hidden />
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                          {row.prefillFiles.map((pending) => (
+                            <li
+                              key={pending.localId}
+                              className="rounded-[9px] border border-border-subtle bg-bg-app p-3"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <DocumentPreviewButton
+                                  fileName={pending.file.name}
+                                  selectedFile={pending.file}
+                                  onPreview={() =>
+                                    openFromFile(row.label, pending.file)
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateDocument(row.key, {
+                                      prefillFiles: row.prefillFiles.filter(
+                                        (item) => item.localId !== pending.localId,
+                                      ),
+                                    })
+                                  }
+                                  className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-[7px] px-2 text-[12px] font-medium text-text-secondary transition-colors duration-150 hover:bg-bg-muted hover:text-danger-500"
+                                  aria-label={`Remove ${pending.file.name}`}
+                                >
+                                  <HiOutlineTrash className="h-4 w-4" aria-hidden />
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </section>
 
             <section id="setup-fields" className="scroll-mt-28">
@@ -744,6 +928,18 @@ export default function ProductSetupPage({ mode, productId }: ProductSetupPagePr
       </div>
 
       {preview ? <PdfPreviewModal preview={preview} onClose={close} /> : null}
+
+      <AddDocumentModal
+        open={addDocumentOpen}
+        options={addDocumentOptions}
+        acceptByType={acceptByType}
+        labelFor={(doc) => doc.label || doc.type}
+        initialRequirementId={addDocumentKey}
+        onClose={() => setAddDocumentOpen(false)}
+        onAdd={(requirementId, files) =>
+          addPrefillFiles(requirementId as DocumentFormRow["key"], files)
+        }
+      />
 
       <CreateTemplateModal
         open={createTemplateOpen}

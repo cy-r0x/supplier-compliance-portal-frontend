@@ -32,10 +32,10 @@ function SegmentGroup({
               disabled={disabled}
               aria-pressed={active}
               onClick={() => onChange(option.id)}
-              className={`cursor-pointer rounded-[6px] px-2.5 py-1 text-[11px] font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`cursor-pointer rounded-[6px] px-2.5 py-1.5 text-[11px] font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:cursor-not-allowed disabled:opacity-60 ${
                 active
-                  ? "bg-bg-elevated text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
+                  ? "bg-bg-elevated text-text-primary shadow-sm ring-1 ring-border-subtle"
+                  : "text-text-secondary hover:bg-bg-elevated/50 hover:text-text-primary"
               }`}
             >
               {option.label}

@@ -32,6 +32,17 @@ const TEXT_KEY_TO_TYPE: Record<keyof ComplianceTextFields, string> = {
   additionalNotes: "ADDITIONAL_NOTES",
 };
 
+export type ExistingPrefillFile = {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+};
+
+export type PendingPrefillFile = {
+  localId: string;
+  file: File;
+};
+
 export type DocumentFormRow = {
   key: keyof ComplianceDocuments;
   label: string;
@@ -40,8 +51,9 @@ export type DocumentFormRow = {
   customKey?: string;
   required: boolean;
   isPublic: boolean;
-  prefillFile: File | null;
-  existingPrefill?: { fileName: string; fileUrl: string };
+  prefillFiles: PendingPrefillFile[];
+  existingPrefills: ExistingPrefillFile[];
+  removedPrefillIds: string[];
 };
 
 export type TextFormRow = {
@@ -83,7 +95,9 @@ export function createEmptyDocumentRows(): DocumentFormRow[] {
       ...(isOther ? { customKey: "other" } : {}),
       required: REQUIRED_DOCS.has(key),
       isPublic: PUBLIC_DOCS.has(key),
-      prefillFile: null,
+      prefillFiles: [],
+      existingPrefills: [],
+      removedPrefillIds: [],
     };
   });
 }
@@ -215,15 +229,15 @@ export function rowsFromApiProduct(product: ApiProductDetail): {
       type,
       required: req ? req.level === "REQUIRED" : defaults.required,
       isPublic: req ? req.visibility === "PUBLIC" : defaults.isPublic,
-      prefillFile: null,
-      ...(req?.documents[0]?.fileUrl && req.documents[0].fileName
-        ? {
-            existingPrefill: {
-              fileName: req.documents[0].fileName,
-              fileUrl: req.documents[0].fileUrl,
-            },
-          }
-        : {}),
+      prefillFiles: [],
+      existingPrefills: (req?.documents ?? [])
+        .filter((doc) => doc.fileUrl && doc.fileName)
+        .map((doc) => ({
+          id: doc.id,
+          fileName: doc.fileName!,
+          fileUrl: doc.fileUrl,
+        })),
+      removedPrefillIds: [],
       ...(isOther ? { customKey: "other" } : {}),
     };
   });
@@ -317,11 +331,12 @@ export function buildCreateProductFormData(
   form.append("fieldRequirements", JSON.stringify(fieldRequirements));
 
   for (const row of input.documents) {
-    if (!row.prefillFile) continue;
-    form.append(
-      documentPrefillFieldName(row.type, row.customKey),
-      row.prefillFile,
-    );
+    for (const pending of row.prefillFiles) {
+      form.append(
+        documentPrefillFieldName(row.type, row.customKey),
+        pending.file,
+      );
+    }
   }
 
   return form;
@@ -375,11 +390,17 @@ export function buildUpdateProductFormData(
   form.append("fieldRequirements", JSON.stringify(fieldRequirements));
 
   for (const row of input.documents) {
-    if (!row.prefillFile) continue;
-    form.append(
-      documentPrefillFieldName(row.type, row.customKey),
-      row.prefillFile,
-    );
+    for (const pending of row.prefillFiles) {
+      form.append(
+        documentPrefillFieldName(row.type, row.customKey),
+        pending.file,
+      );
+    }
+  }
+
+  const removedIds = input.documents.flatMap((row) => row.removedPrefillIds);
+  if (removedIds.length > 0) {
+    form.append("removedDocumentAnswerIds", JSON.stringify(removedIds));
   }
 
   return form;
