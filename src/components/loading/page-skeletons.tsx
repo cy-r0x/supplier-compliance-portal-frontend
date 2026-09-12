@@ -176,33 +176,37 @@ export function ProductReviewPageSkeleton() {
         <Skeleton className="h-4 w-40" />
 
         <section className="mt-6 rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex items-start gap-4">
               <Skeleton className="size-[72px] shrink-0 rounded-[10px]" />
               <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-5 w-20" />
+                <Skeleton className="h-5 w-28" />
                 <Skeleton className="h-7 w-64 max-w-full" />
                 <Skeleton className="h-4 w-48" />
               </div>
             </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-10 w-24 rounded-[9px]" />
-              <Skeleton className="h-10 w-24 rounded-[9px]" />
-            </div>
+            <Skeleton className="h-10 w-full max-w-xs rounded-[9px]" />
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <Skeleton className="h-16 rounded-[9px]" />
+            <Skeleton className="h-16 rounded-[9px]" />
+            <Skeleton className="h-16 rounded-[9px]" />
           </div>
         </section>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
-          <section className="rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
+        <div className="mt-8 space-y-8">
+          <section>
             <Skeleton className="h-5 w-28" />
-            <div className="mt-4 space-y-3">
-              <SkeletonRows count={3} height="h-14" />
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Skeleton className="h-36 rounded-[12px]" />
+              <Skeleton className="h-36 rounded-[12px]" />
             </div>
           </section>
-          <section className="rounded-[12px] border border-border-subtle bg-bg-elevated p-5">
-            <Skeleton className="h-5 w-24" />
-            <div className="mt-4 space-y-3">
-              <SkeletonRows count={3} height="h-20" />
+          <section>
+            <Skeleton className="h-5 w-40" />
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <Skeleton className="h-28 rounded-[12px]" />
+              <Skeleton className="h-28 rounded-[12px]" />
             </div>
           </section>
         </div>

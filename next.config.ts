@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
-const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3000";
+const backendUrl = process.env.BACKEND_URL ?? "http://localhost:3001";
 const minioProxyTarget = (
-  process.env.MINIO_PROXY_TARGET ?? "http://49.213.52.38:9000"
+  process.env.MINIO_PROXY_TARGET ?? "http://localhost:9000"
 ).replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
